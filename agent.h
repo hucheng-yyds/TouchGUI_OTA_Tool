@@ -10,7 +10,7 @@ class Agent : public QObject
 public:
     explicit Agent(QObject *parent = nullptr);
 
-    void startScanDevice(uint32_t timeOut, const QString &address);
+    void startScanDevice(uint32_t timeOut, const QStringList &address);
 
 private:
     void SendMessage(QString);
@@ -26,7 +26,7 @@ signals:
 
 private:
     QBluetoothDeviceDiscoveryAgent *m_agent;
-    QString m_address;
+    QStringList m_address_list;
 };
 
 #endif // AGENT_H

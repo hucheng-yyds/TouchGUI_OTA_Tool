@@ -1,9 +1,10 @@
 #ifndef CONTROLLER_H
 #define CONTROLLER_H
 
-#include <QObject>
+#include <QThread>
 #include <QLowEnergyController>
 #include <QBluetoothDeviceInfo>
+#include "service.h"
 
 class Controller : public QObject
 {
@@ -12,6 +13,7 @@ public:
     explicit Controller(QObject *parent = nullptr);
     ~Controller();
 
+    void SetProperty(QByteArrayList &data, QByteArrayList &name, int size);
     void ConnectDevice(const QBluetoothDeviceInfo &info);
     void DisconnectDevice(void);
 
@@ -19,7 +21,6 @@ public:
 
 private:
     void SendMessage(QString);
-
 
 private slots:
     void onConnected();
@@ -30,14 +31,18 @@ private slots:
     void onServiceDiscovered(QBluetoothUuid);
     void onDiscoveryFinished();
     void onConnectionUpdated(const QLowEnergyConnectionParameters &parameters);
+    void onReconnectDevice();
 
 signals:
-    void message(QString msg);
-    void serviceDiscovered(const QBluetoothUuid &newService);
+    void message(QString msg);;
+    void serviceDiscovered(QLowEnergyService *service, const QString &address);
+    void upgradeResult(bool success, const QString &address);
 
 private:
-    QLowEnergyController *m_controller;
-
+    QThread *m_thread = nullptr;
+    QLowEnergyController *m_controller = nullptr;
+    QBluetoothDeviceInfo m_device_info;
+    Service *m_service = nullptr;
 };
 
 #endif // CONTROLLER_H

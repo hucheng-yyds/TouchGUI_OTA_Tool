@@ -1,4 +1,4 @@
-#include "service.h"
+﻿#include "service.h"
 #include <QTimer>
 #include <QEventLoop>
 
@@ -7,16 +7,24 @@ Service::Service(QObject *parent) : QObject(parent)
     m_service = NULL;
 }
 
-void Service::ConnectService(QLowEnergyService * service)
+void Service::SetProperty(QByteArrayList &data, QByteArrayList &name, int size)
+{
+    m_file_data_list = data;
+    m_file_name_list = name;
+    m_total_file_size = size;
+}
+
+void Service::ConnectService(QLowEnergyService * service, const QString &address)
 {
     m_service = service;
+    m_address = address;
     if(m_service)
     {
-       /* if(m_service->state() == QLowEnergyService::ServiceDiscovered)
+        if(m_service->state() == QLowEnergyService::ServiceDiscovered)
         {
             onStateChanged(QLowEnergyService::ServiceDiscovered);
         }
-        else */if (m_service->state() == QLowEnergyService::DiscoveryRequired)
+        else if (m_service->state() == QLowEnergyService::DiscoveryRequired)
         {
             connect(m_service, SIGNAL(stateChanged(QLowEnergyService::ServiceState)), this, SLOT(onStateChanged(QLowEnergyService::ServiceState)));
             connect(m_service, SIGNAL(characteristicChanged(QLowEnergyCharacteristic, QByteArray)), this, SLOT(onCharacteristicChanged(QLowEnergyCharacteristic, QByteArray)));
@@ -25,15 +33,18 @@ void Service::ConnectService(QLowEnergyService * service)
             connect(m_service, SIGNAL(descriptorRead(QLowEnergyDescriptor, QByteArray)), this, SLOT(onDescriptorRead(QLowEnergyDescriptor, QByteArray)));
             connect(m_service, SIGNAL(descriptorWritten(QLowEnergyDescriptor, QByteArray)), this, SLOT(onDescriptorWritten(QLowEnergyDescriptor, QByteArray)));
             connect(m_service, SIGNAL(error(QLowEnergyService::ServiceError)), this, SLOT(onError(QLowEnergyService::ServiceError)));
-            qDebug() << "discoverDetails:" << m_service->state();
+            SendMessage("discoverDetails:" + QString::number(m_service->state()));
             m_service->discoverDetails();
+//            QTimer::singleShot(500, this, [this]() {
+//                m_service->discoverDetails();
+//            });
         }
     }
 }
 
 void Service::SendMessage(QString msg)
 {
-    qDebug() << "Service:" << msg;
+    qDebug() << "Service:" << m_address << msg;
     emit message(msg);
 }
 
@@ -78,7 +89,7 @@ void Service::ReadCharacteristic(QLowEnergyCharacteristic ch)
 
 void Service::WriteCharacteristic(QLowEnergyCharacteristic ch, const QByteArray &arr)
 {
-    qDebug() << __FUNCTION__ << arr.left(10).toHex('|');
+//    qDebug() << __FUNCTION__ << arr.left(10).toHex('|');
     if(m_service)
     {
         if(ch.isValid())
@@ -98,59 +109,6 @@ void Service::WriteCharacteristic(QLowEnergyCharacteristic ch, const QByteArray 
         }
 
     }
-}
-
-void Service::SendCmdKeyData(const uchar cmd, const uchar key, QByteArray &byte)
-{
-    byte.prepend(key);
-    byte.prepend(cmd);
-    WriteCharacteristic(m_characteristics_list[0], byte);
-}
-
-void Service::StartSendData()
-{
-    QByteArray byte;
-    byte.append(getFileType(m_file_index));
-    byte.append(m_file_data_list[m_file_index].size());
-    byte.append(m_file_data_list[m_file_index].size() >> 8);
-    byte.append(m_file_data_list[m_file_index].size() >> 16);
-    byte.append(m_file_data_list[m_file_index].size() >> 24);
-    byte.append((char)0x00);
-    byte.append(m_file_name_list[m_file_index]);
-    SendCmdKeyData(CMD_HEAD_OTA, CMD_SEND_START, byte);
-}
-
-void Service::StopSendData()
-{
-    QByteArray byte;
-    byte.append(m_check_sum);
-    byte.append(m_check_sum >> 8);
-    byte.append(m_check_sum >> 16);
-    byte.append(m_check_sum >> 24);
-    byte.append(QCryptographicHash::hash(m_file_data_list[m_file_index],
-                                         QCryptographicHash::Md5).toHex());
-    SendCmdKeyData(CMD_HEAD_OTA, CMD_SEND_END, byte);
-}
-
-uchar Service::getFileType(int index)
-{
-    uchar c = 0;
-    switch (index) {
-    case 0:
-        c = 0x23;
-        break;
-    case 1:
-        c = 0x11;
-        break;
-    case 2:
-    case 3:
-    case 4:
-        c = 0xff;
-        break;
-    default:
-        break;
-    }
-    return c;
 }
 
 uint32_t Service::CheckSum(uint8_t *pBuffer, uint8_t len)
@@ -190,14 +148,14 @@ void Service::onStateChanged(QLowEnergyService::ServiceState newState)
         {
             SendMessage("Discovered services");
             QList<QLowEnergyCharacteristic> characteristics = m_service->characteristics();
-            qDebug() << characteristics.size();
-//            qDeleteAll(m_characteristics_list);
-            m_characteristics_list.clear();
-            m_characteristics_list = characteristics;
 
             foreach(QLowEnergyCharacteristic ch, characteristics)
             {
                 qDebug() << ch.uuid();
+                if (ch.uuid().data1 == 0x27f6
+                        || ch.uuid().data1 == 0x0af6) {
+                    m_characteristics = ch;
+                }
                 if (ch.uuid().data1 == 0x27f7
                         || ch.uuid().data1 == 0x0af7) {
                     OpenNotify(ch, true);
@@ -206,11 +164,11 @@ void Service::onStateChanged(QLowEnergyService::ServiceState newState)
             }
             QByteArray byte(2, 0);
             byte[0] = CMD_HEAD_PARAM;
-            byte[1] = KEY_GET_INFO;
-            WriteCharacteristic(m_characteristics_list[0], byte);
-            byte[0] = CMD_HEAD_PARAM;
             byte[1] = KEY_GET_MTU;
-            WriteCharacteristic(m_characteristics_list[0], byte);
+            WriteCharacteristic(m_characteristics, byte);
+            byte[0] = CMD_HEAD_PARAM;
+            byte[1] = KEY_GET_INFO;
+            WriteCharacteristic(m_characteristics, byte);
         }
             break;
 
@@ -232,80 +190,67 @@ void Service::onCharacteristicChanged(const QLowEnergyCharacteristic &info, cons
             SendCmdKeyData(CMD_HEAD_OTA, CMD_SET_PRN, byte);
             break;
         case CMD_SEND_BODY:
-            qDebug() << "m_file_offset:" << m_file_offset
-                     << "m_file_data_list size:" << m_file_data_list[m_file_index].size();
-            m_timeout_num = 3;
-            m_cur_sum = (value[3] & 0xFF)
+            m_cur_sum = (value[3] & 0xFF)//获取设备当前checksum
                     | ((value[4] & 0xFF) << 8)
                     | ((value[5] & 0xFF) << 16)
                     | ((value[6] & 0xFF) << 24);
-            qDebug() << "devices sum:" << m_cur_sum
-                     << "service sum:" << m_check_sum;
-            if (m_check_sum == m_cur_sum) {
+            m_cur_offset = (value[7] & 0xFF)//获取设备当前offset
+                    | ((value[8] & 0xFF) << 8)
+                    | ((value[9] & 0xFF) << 16)
+                    | ((value[10] & 0xFF) << 24);
+            qDebug() << m_address
+                     << "m_file_name:" << m_file_name_list[m_file_index]
+                     << "m_file_size:" << m_file_data_list[m_file_index].size()
+                     << "m_cur_sum:" << m_cur_sum
+                     << "m_check_sum:" << m_check_sum
+                     << "m_cur_offset:" << m_cur_offset
+                     << "m_file_offset:" << m_file_offset;
+            if (m_check_sum == m_cur_sum) {//校验客户端与设备的checksum
                 m_package_num = 0;
             } else {
                 qDebug() << "check_sum error";
             }
             break;
         case CMD_SEND_END:
-            if (0 == value[2]) {
+            if (0 == value[2]) {//文件发送完成
+                m_last_pack = false;
                 m_package_num = 0;
                 m_file_offset = 0;
                 m_check_sum = 0;
                 m_file_index ++;
                 if (m_file_index >= m_file_data_list.size()) {
-                    m_file_index = 0;
+                    emit upgradeResult(true, m_address);
                     break;
                 }
+                StartSendData();
             }
-            StartSendData();
             break;
         case CMD_SET_PRN:
-            if (value[2] != 0) {
+            if (0 != value[2]) {//成功获取PRN
                 m_device_prn = value[2];
             }
             for (int i = 0; i < m_file_data_list[m_file_index].size(); i += m_device_mtu) {
-                m_file_offset = i;
+                //开始发送数据
+                m_file_offset = i + m_device_mtu;
                 m_package_num ++;
-                if ((i + m_device_mtu) >= m_file_data_list[m_file_index].size()) {
-                    m_file_offset = i + m_device_mtu;
+                if (m_file_offset >= m_file_data_list[m_file_index].size()) {
+                    //处理最后一包数据
+                    m_last_pack = true;
                 }
                 byte = m_file_data_list[m_file_index].mid(i, m_device_mtu);
-//                qDebug() << "byte.size():" << byte.size();
                 m_check_sum += CheckSum((uchar*)byte.data(), byte.size());
                 byte.prepend((char)0x00);
-send_data:
-                QEventLoop eventloop;
                 SendCmdKeyData(CMD_HEAD_OTA, CMD_SEND_BODY, byte);
-//                QTimer::singleShot(5000, &eventloop, &QEventLoop::quit);
-//                connect(m_service, &QLowEnergyService::characteristicWritten, &eventloop, &QEventLoop::quit);
-//                eventloop.exec();
                 if (m_package_num >= m_device_prn) {
-                    qDebug() << "fill package" << m_package_num;
-                    QTimer::singleShot(5000, &eventloop, &QEventLoop::quit);
-                    connect(m_service, &QLowEnergyService::characteristicChanged, &eventloop, &QEventLoop::quit);
-                    eventloop.exec();
+                    WaitReplyData(5);
                     if (m_package_num) {
-                        m_timeout_num --;
-                        qDebug() << "recv d1 02 time out" << m_timeout_num;
-                        if (m_timeout_num < 0) {
-                            break ;
-                        } else {
-                            goto send_data;
-                        }
+                        qDebug() << i << m_address << "recv d1 02 time out";
+                        emit reconnectDevice();
+                        break ;
                     }
                 }
-                if (m_file_offset >= m_file_data_list[m_file_index].size()) {
+                if (m_last_pack) {
                     StopSendData();
-//                    if (m_package_num) {
-//                        m_timeout_num --;
-//                        qDebug() << "recv d1 03 time out" << m_timeout_num;
-//                        if (m_timeout_num < 0) {
-//                            break ;
-//                        } else {
-//                            goto send_data;
-//                        }
-//                    }
                 }
             }
             break;
@@ -374,4 +319,84 @@ void Service::onError(QLowEnergyService::ServiceError error)
 
         SendMessage(str);
     }
+}
+
+void Service::SendCmdKeyData(const uchar cmd, const uchar key, QByteArray &byte)
+{
+    byte.prepend(key);
+    byte.prepend(cmd);
+    WriteCharacteristic(m_characteristics, byte);
+}
+
+void Service::StartSendData()
+{
+    m_last_pack = false;
+    m_package_num = 0;
+    m_file_offset = 0;
+    m_check_sum = 0;
+
+    QByteArray byte;
+    byte.append(getFileType(m_file_index));
+    byte.append(m_file_data_list[m_file_index].size());
+    byte.append(m_file_data_list[m_file_index].size() >> 8);
+    byte.append(m_file_data_list[m_file_index].size() >> 16);
+    byte.append(m_file_data_list[m_file_index].size() >> 24);
+    byte.append((char)0x00);
+    byte.append(m_file_name_list[m_file_index]);
+    SendCmdKeyData(CMD_HEAD_OTA, CMD_SEND_START, byte);
+}
+
+void Service::StopSendData()
+{
+    QByteArray byte;
+    byte.append(m_check_sum);
+    byte.append(m_check_sum >> 8);
+    byte.append(m_check_sum >> 16);
+    byte.append(m_check_sum >> 24);
+    byte.append(QCryptographicHash::hash(m_file_data_list[m_file_index],
+                                         QCryptographicHash::Md5).toHex());
+    SendCmdKeyData(CMD_HEAD_OTA, CMD_SEND_END, byte);
+}
+
+void Service::SetOffsetData()
+{
+    QByteArray byte;
+    byte.append(m_cur_offset);
+    byte.append(m_cur_offset >> 8);
+    byte.append(m_cur_offset >> 16);
+    byte.append(m_cur_offset >> 24);
+    byte.append(m_cur_sum);
+    byte.append(m_cur_sum >> 8);
+    byte.append(m_cur_sum >> 16);
+    byte.append(m_cur_sum >> 24);
+    SendCmdKeyData(CMD_HEAD_OTA, CMD_SET_OFFSET, byte);
+}
+
+uchar Service::getFileType(int index)
+{
+    uchar c = 0;
+    switch (index) {
+    case 0:
+        c = 0x23;
+        break;
+    case 1:
+        c = 0x11;
+        break;
+    case 2:
+    case 3:
+    case 4:
+        c = 0xff;
+        break;
+    default:
+        break;
+    }
+    return c;
+}
+
+void Service::WaitReplyData(int secTimeout)
+{
+    QEventLoop eventloop;
+    QTimer::singleShot(secTimeout*1000, &eventloop, &QEventLoop::quit);
+    connect(m_service, &QLowEnergyService::characteristicChanged, &eventloop, &QEventLoop::quit);
+    eventloop.exec();
 }
