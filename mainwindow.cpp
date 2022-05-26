@@ -8,6 +8,7 @@
 #include <QDir>
 #include <QTime>
 #include <QFileDialog>
+#include <QMessageBox>
 
 //#define SAMPLE
 MainWindow::MainWindow(QWidget *parent)
@@ -23,9 +24,32 @@ MainWindow::MainWindow(QWidget *parent)
 
     qDebug() << "main thread:" << QThread::currentThreadId();
     ui->label_19->installEventFilter(this);
-    ui->label_19->setText(QCoreApplication::applicationDirPath() + "/oy28_ota_file");
 //    agent->startScanDevice(10000, (QStringList()/*<<"3F:E1"*/<<"3D:D8"<<"57:E7"<<"6E:E9"<<"40:E8"));
-    ui->lineEdit_4->setText("3D:D8;57:E7;6E:E9;40:E8");
+    QFile file(QCoreApplication::applicationDirPath() + "/setup.txt");
+    if (file.open(QIODevice::ReadWrite)) {
+        QTextStream in(&file);
+        QString string;
+        while (in.readLineInto(&string)) {
+            qDebug() << string;
+            if (!string.indexOf("dir:")) {
+                string.remove(0, 4);
+                ui->label_19->setText(string);
+            } else if (!string.indexOf("ver:")) {
+                string.remove(0, 4);
+                ui->label_20->setText(string);
+                ui->label_31->setText(string);
+                ui->label_38->setText(string);
+                m_version = string.toUtf8();
+            } else {
+                m_address_list.append(string);
+            }
+        }
+        file.close();
+    }
+    if (ui->label_19->text().isEmpty()) {//如果配置文件没有指定路径，那么默认当前目录 oy28_ota_file
+        ui->label_19->setText("oy28_ota_file");
+    }
+    GetDirectoryFile(ui->label_19->text());
 #else
     device = new Device;
 #endif
@@ -37,31 +61,42 @@ MainWindow::~MainWindow()
     delete ui;
 }
 
+void MainWindow::GetDirectoryFile(const QString &dirName)
+{
+    qDebug() << "GetDirectoryFile:" << dirName;
+    if(dirName.isEmpty()) {
+        return ;
+    }
+    QDir dir(dirName);
+    ui->label_19->setText(QDir::current().relativeFilePath(dirName));//显示相对路径
+    QStringList nameFilters("*.bin");
+    QStringList files = dir.entryList(nameFilters, QDir::Files|QDir::Readable, QDir::Name);
+    m_total_file_size = 0;
+    m_file_name_list.clear();
+    m_file_data_list.clear();
+    foreach(QString name, files) {
+        QFile file(dir.absoluteFilePath(name));
+        qDebug() << "file name:" << file.fileName();
+        m_total_file_size += file.size();
+        if (file.open(QIODevice::ReadOnly)) {
+            m_file_name_list.append(name.toUtf8());
+            m_file_data_list.append(file.readAll());
+            file.close();
+        } else {
+            qWarning() << "file cannot open";
+        }
+    }
+}
+
 bool MainWindow::eventFilter(QObject *obj, QEvent *ev)
 {
     if (ui->label_19 == obj
             && ev->type() == QEvent::MouseButtonDblClick) {
-        QString dirString = QFileDialog::getExistingDirectory(this, tr("Open Directory"),
-                                                              QCoreApplication::applicationDirPath(),
-                                                              QFileDialog::ShowDirsOnly
-                                                              | QFileDialog::DontResolveSymlinks);
-        qDebug() << dirString;
-        QDir dir(dirString);
-        QStringList nameFilters("*.bin");
-        QStringList files = dir.entryList(nameFilters, QDir::Files|QDir::Readable, QDir::Name);
-        foreach(QString name, files) {
-            QFile file(dir.absoluteFilePath(name));
-            qDebug() << "file name:" << file.fileName();
-            m_total_file_size += file.size();
-            if (file.open(QIODevice::ReadOnly)) {
-                m_file_name_list.append(name.toUtf8());
-                m_file_data_list.append(file.readAll());
-                file.close();
-                ui->pushButton_4->setEnabled(true);
-            } else {
-                qWarning() << "file cannot open";
-            }
-        }
+        QString dirName = QFileDialog::getExistingDirectory(this, tr("Open Directory"),
+                                                            QCoreApplication::applicationDirPath(),
+                                                            QFileDialog::ShowDirsOnly
+                                                            | QFileDialog::DontResolveSymlinks);
+        GetDirectoryFile(dirName);
         return true;
     }  else {
         // pass the event on to the parent class
@@ -76,41 +111,42 @@ void MainWindow::onDeviceDiscovered(const QBluetoothDeviceInfo &info)
     connect(this, &MainWindow::ConnectDevice, controller, &Controller::ConnectDevice);
 //    controller->start();
     controller_list.append(controller);
-    controller->SetProperty(m_file_data_list, m_file_name_list, m_total_file_size);
+    controller->SetProperty(m_file_data_list, m_file_name_list, m_total_file_size, m_version);
 //    controller->ConnectDevice(info);
     emit ConnectDevice(info);
     disconnect(this, &MainWindow::ConnectDevice, controller, &Controller::ConnectDevice);
     int rowCount = ui->tableWidget_2->rowCount();
-    ui->tableWidget_2->insertRow(rowCount);
+    ui->tableWidget_2->insertRow(rowCount);//添加到正在升级列表
     ui->tableWidget_2->setItem(rowCount, 0, new QTableWidgetItem(info.address().toString()));
 }
 
 void MainWindow::onUpgradeResult(bool success, const QString &address)
 {
     QList<QTableWidgetItem*> list = ui->tableWidget_2->findItems(address, Qt::MatchFixedString);
-    if (!list.isEmpty()) {
+    if (!list.isEmpty()) {//单个升级完成
         int index = ui->tableWidget_2->row(list[0]);
-        ui->tableWidget_2->removeRow(index);
+        ui->tableWidget_2->removeRow(index);//从正在升级列表移除
         qDebug() << address << "list size:" << list.size() << index;
         delete controller_list[index];
         controller_list.removeAt(index);
         if (success) {
-            ui->listWidget->addItem(address);
+            ui->listWidget->addItem(address);//添加到升级成功列表
             ui->label_33->setText(QString::number(ui->listWidget->count()));
         } else {
             int failCount = ui->label_47->text().toInt();
             qDebug() << "failCount:" << failCount;
-            ui->label_47->setText(QString::number(++failCount));
+            ui->label_47->setText(QString::number(++failCount));//未完成数
         }
     }
-    if (controller_list.isEmpty()) {
+    if (controller_list.isEmpty()) {//全部升级完成
         m_timer->stop();
         ui->tabWidget->setCurrentIndex(5);
-        ui->label_46->setText(QString::number(ui->listWidget->count()));
-        ui->label_49->setText(ui->label_34->text());
+        ui->label_46->setText(QString::number(ui->listWidget->count()));//已完成数
+        ui->label_49->setText(ui->label_34->text());//总耗时
         double hourCount = ui->listWidget->count() / (m_elapsed_second / 3600.00);
-        qDebug() << hourCount << m_elapsed_second << ui->listWidget->count();
-        ui->label_48->setText(QString::number(hourCount, 'f', 0)+" units/hour");
+        qDebug() << "hourCount:" << hourCount << m_elapsed_second << ui->listWidget->count();
+        ui->label_48->setText(QString::number(hourCount, 'f', 0)+" units/hour");//平均速度
+        ui->pushButton_4->setEnabled(true);
     }
 }
 
@@ -125,9 +161,24 @@ void MainWindow::on_pushButton_4_clicked()
 {
 #ifndef SAMPLE
 //    agent->startScanDevice(10000, (QStringList()<<"3D:D8"<<"3F:E1"<<"57:E7"<<"6E:E9"<<"40:E8"));
-    agent->startScanDevice(10000, ui->lineEdit_4->text().split(';'));
+    if (0 == m_total_file_size) {
+        QMessageBox::information(this, "提示",
+                                 "请检查升级包!",
+                                 QMessageBox::NoButton);
+        return ;
+    }
+    if (ui->label_20->text().isEmpty()) {
+        QMessageBox::information(this, "提示",
+                                 "请填写版本号!",
+                                 QMessageBox::NoButton);
+        return ;
+    }
+    agent->startScanDevice(10000, m_address_list);
+    ui->label_32->setText(QString::number(m_address_list.size()));
+    ui->label_40->setText(QString::number(m_address_list.size()));//目标总数
     ui->tabWidget->setCurrentIndex(4);
     m_timer->start(1000);
+    ui->pushButton_4->setEnabled(false);
 #else
     device->startDeviceDiscovery();
 #endif
@@ -147,6 +198,7 @@ void MainWindow::on_pushButton_3_clicked()
 //    }
     qDeleteAll(controller_list);
     controller_list.clear();
+    ui->pushButton_4->setEnabled(true);
 #else
     device->disconnectFromDevice();
 #endif

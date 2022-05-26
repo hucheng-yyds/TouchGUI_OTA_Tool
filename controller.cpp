@@ -28,9 +28,9 @@ Controller::~Controller()
     }
 }
 
-void Controller::SetProperty(QByteArrayList &data, QByteArrayList &name, int size)
+void Controller::SetProperty(QByteArrayList &data, QByteArrayList &name, int size, QByteArray &version)
 {
-    m_service->SetProperty(data, name, size);
+    m_service->SetProperty(data, name, size, version);
 }
 
 void Controller::ConnectDevice(const QBluetoothDeviceInfo &info)
@@ -101,6 +101,7 @@ void Controller::onConnected()
 void Controller::onDisconnected()
 {
     SendMessage("device disconnected");
+    emit upgradeResult(false, m_controller->remoteAddress().toString());
 }
 
 void Controller::onStateChanged(QLowEnergyController::ControllerState state)

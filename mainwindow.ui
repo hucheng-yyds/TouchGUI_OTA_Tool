@@ -457,14 +457,11 @@
                <pointsize>15</pointsize>
               </font>
              </property>
-             <property name="text">
-              <string>TextLabel</string>
+             <property name="toolTip">
+              <string>&lt;html&gt;&lt;head/&gt;&lt;body&gt;&lt;p&gt;双击选择OTA包目录&lt;/p&gt;&lt;/body&gt;&lt;/html&gt;</string>
              </property>
              <property name="wordWrap">
               <bool>true</bool>
-             </property>
-             <property name="textInteractionFlags">
-              <set>Qt::LinksAccessibleByMouse|Qt::TextEditable|Qt::TextSelectableByMouse</set>
              </property>
             </widget>
            </item>
@@ -495,9 +492,6 @@
               <font>
                <pointsize>15</pointsize>
               </font>
-             </property>
-             <property name="text">
-              <string>TextLabel</string>
              </property>
             </widget>
            </item>
@@ -552,6 +546,18 @@
              </property>
             </widget>
            </item>
+           <item row="3" column="1">
+            <widget class="QLabel" name="label_21">
+             <property name="font">
+              <font>
+               <pointsize>15</pointsize>
+              </font>
+             </property>
+             <property name="text">
+              <string>TextLabel</string>
+             </property>
+            </widget>
+           </item>
            <item row="4" column="0">
             <widget class="QPushButton" name="pushButton_3">
              <property name="minimumSize">
@@ -572,9 +578,6 @@
            </item>
            <item row="4" column="1">
             <widget class="QPushButton" name="pushButton_4">
-             <property name="enabled">
-              <bool>false</bool>
-             </property>
              <property name="font">
               <font>
                <pointsize>15</pointsize>
@@ -582,18 +585,6 @@
              </property>
              <property name="text">
               <string>开始OTA升级</string>
-             </property>
-            </widget>
-           </item>
-           <item row="3" column="1">
-            <widget class="QLabel" name="label_21">
-             <property name="font">
-              <font>
-               <pointsize>15</pointsize>
-              </font>
-             </property>
-             <property name="text">
-              <string>TextLabel</string>
              </property>
             </widget>
            </item>
@@ -1018,7 +1009,7 @@
           <item>
            <widget class="QLabel" name="label_39">
             <property name="text">
-             <string>TextLabel</string>
+             <string>oy28_ota_file</string>
             </property>
            </widget>
           </item>

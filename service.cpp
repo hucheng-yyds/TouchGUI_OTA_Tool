@@ -1,4 +1,5 @@
-﻿#include "service.h"
+#include "service.h"
+#include <QElapsedTimer>
 #include <QTimer>
 #include <QEventLoop>
 
@@ -7,11 +8,12 @@ Service::Service(QObject *parent) : QObject(parent)
     m_service = NULL;
 }
 
-void Service::SetProperty(QByteArrayList &data, QByteArrayList &name, int size)
+void Service::SetProperty(QByteArrayList &data, QByteArrayList &name, int size, QByteArray &version)
 {
     m_file_data_list = data;
     m_file_name_list = name;
     m_total_file_size = size;
+    m_version = version;
 }
 
 void Service::ConnectService(QLowEnergyService * service, const QString &address)
@@ -94,11 +96,11 @@ void Service::WriteCharacteristic(QLowEnergyCharacteristic ch, const QByteArray 
     {
         if(ch.isValid())
         {
-            if(ch.properties() & QLowEnergyCharacteristic::Write)
+            /*if(ch.properties() & QLowEnergyCharacteristic::Write)
             {
                 m_service->writeCharacteristic(ch, arr, QLowEnergyService::WriteWithResponse);
             }
-            else if(ch.properties() & QLowEnergyCharacteristic::WriteNoResponse)
+            else */if(ch.properties() & QLowEnergyCharacteristic::WriteNoResponse)
             {
                 m_service->writeCharacteristic(ch, arr, QLowEnergyService::WriteWithoutResponse);
             }
@@ -107,7 +109,6 @@ void Service::WriteCharacteristic(QLowEnergyCharacteristic ch, const QByteArray 
                 m_service->writeCharacteristic(ch, arr, QLowEnergyService::WriteSigned);
             }
         }
-
     }
 }
 
@@ -162,13 +163,8 @@ void Service::onStateChanged(QLowEnergyService::ServiceState newState)
                     emit discoveryCharacteristic(ch);
                 }
             }
-            QByteArray byte(2, 0);
-            byte[0] = CMD_HEAD_PARAM;
-            byte[1] = KEY_GET_MTU;
-            WriteCharacteristic(m_characteristics, byte);
-            byte[0] = CMD_HEAD_PARAM;
-            byte[1] = KEY_GET_INFO;
-            WriteCharacteristic(m_characteristics, byte);
+            SendCmdKeyData(CMD_HEAD_PARAM, KEY_GET_MTU);
+            SendCmdKeyData(CMD_HEAD_PARAM, KEY_GET_INFO);
         }
             break;
 
@@ -182,12 +178,10 @@ void Service::onCharacteristicChanged(const QLowEnergyCharacteristic &info, cons
 {
     QString ch = info.uuid().toString() + " - Characteristic Changed:" + value.toHex('|');
     SendMessage(ch);
-    QByteArray byte;
     if ((uchar)value[0] == CMD_HEAD_OTA) {
         switch (value[1]) {
         case CMD_SEND_START:
-            byte.append((char)m_device_prn);
-            SendCmdKeyData(CMD_HEAD_OTA, CMD_SET_PRN, byte);
+            SendCmdKeyData(CMD_HEAD_OTA, CMD_SET_PRN);
             break;
         case CMD_SEND_BODY:
             m_cur_sum = (value[3] & 0xFF)//获取设备当前checksum
@@ -208,68 +202,54 @@ void Service::onCharacteristicChanged(const QLowEnergyCharacteristic &info, cons
             if (m_check_sum == m_cur_sum) {//校验客户端与设备的checksum
                 m_package_num = 0;
             } else {
-                qDebug() << "check_sum error";
+                SendMessage("check_sum error");
             }
             break;
         case CMD_SEND_END:
             if (0 == value[2]) {//文件发送完成
-                m_last_pack = false;
-                m_package_num = 0;
-                m_file_offset = 0;
-                m_check_sum = 0;
+                StopSendData();
                 m_file_index ++;
                 if (m_file_index >= m_file_data_list.size()) {
                     emit upgradeResult(true, m_address);
                     break;
                 }
-                StartSendData();
+                SendCmdKeyData(CMD_HEAD_OTA, CMD_SEND_START);
             }
             break;
         case CMD_SET_PRN:
             if (0 != value[2]) {//成功获取PRN
                 m_device_prn = value[2];
-            }
-            for (int i = 0; i < m_file_data_list[m_file_index].size(); i += m_device_mtu) {
-                //开始发送数据
-                m_file_offset = i + m_device_mtu;
-                m_package_num ++;
-                if (m_file_offset >= m_file_data_list[m_file_index].size()) {
-                    //处理最后一包数据
-                    m_last_pack = true;
-                }
-                byte = m_file_data_list[m_file_index].mid(i, m_device_mtu);
-                m_check_sum += CheckSum((uchar*)byte.data(), byte.size());
-                byte.prepend((char)0x00);
-                SendCmdKeyData(CMD_HEAD_OTA, CMD_SEND_BODY, byte);
-                if (m_package_num >= m_device_prn) {
-                    WaitReplyData(5);
-                    if (m_package_num) {
-                        qDebug() << i << m_address << "recv d1 02 time out";
-                        emit reconnectDevice();
-                        break ;
-                    }
-                }
-                if (m_last_pack) {
-                    StopSendData();
-                }
+                StartSendData();
             }
             break;
         default:
             break;
         }
-    } else if (value[0] == CMD_HEAD_PARAM
-               && value[1] == KEY_GET_INFO) {//校验设备信息：版本号、模式、电量
-
-    } else if (value[0] == CMD_HEAD_PARAM
-               && (uchar)value[1] == KEY_GET_MTU) {//校验MTU包大小
-        m_device_mtu &= (value[2] << 8) + value[3];
-        byte.append(m_total_file_size);
-        byte.append(m_total_file_size >> 8);
-        byte.append(m_total_file_size >> 16);
-        byte.append(m_total_file_size >> 24);
-        byte.append(QByteArray(4, 0));
-        SendCmdKeyData(CMD_HEAD_OTA, CMD_SET_PROGRESS, byte);
-        StartSendData();
+    } else if (value[0] == CMD_HEAD_PARAM) {
+        switch (value[1]) {
+        case KEY_GET_INFO:
+            if (value[7] >= 30 && value[10] == 1) {
+                SendCmdKeyData(CMD_HEAD_PARAM, KEY_GET_VER);
+            } else {
+                SendMessage("battery low or no has_detail_version");
+                emit upgradeResult(false, m_address);
+            }
+            break;
+        case KEY_GET_VER:
+            if (CompareVersion(m_version, value.mid(8, 12)) > 0) {
+                SendCmdKeyData(CMD_HEAD_OTA, CMD_SET_PROGRESS);
+                SendCmdKeyData(CMD_HEAD_OTA, CMD_SEND_START);
+            } else {
+                SendMessage("version small");
+                emit upgradeResult(false, m_address);
+            }
+            break;
+        case KEY_GET_MTU:
+            m_device_mtu &= (value[2] << 8) + value[3];
+            break;
+        default:
+            break;
+        }
     }
 }
 
@@ -321,55 +301,99 @@ void Service::onError(QLowEnergyService::ServiceError error)
     }
 }
 
-void Service::SendCmdKeyData(const uchar cmd, const uchar key, QByteArray &byte)
+void Service::SendCmdKeyData(const uchar cmd, const uchar key)
 {
-    byte.prepend(key);
-    byte.prepend(cmd);
+    QByteArray byte;
+    byte.append(cmd);
+    byte.append(key);
+    if (CMD_HEAD_OTA == cmd) {
+        switch (key) {
+        case CMD_SEND_START:
+            byte.append(getFileType(m_file_index));
+            byte.append(m_file_data_list[m_file_index].size());
+            byte.append(m_file_data_list[m_file_index].size() >> 8);
+            byte.append(m_file_data_list[m_file_index].size() >> 16);
+            byte.append(m_file_data_list[m_file_index].size() >> 24);
+            byte.append((char)0x00);
+            byte.append(m_file_name_list[m_file_index]);
+            break;
+        case CMD_SEND_END:
+            byte.append(m_check_sum);
+            byte.append(m_check_sum >> 8);
+            byte.append(m_check_sum >> 16);
+            byte.append(m_check_sum >> 24);
+            byte.append(QCryptographicHash::hash(m_file_data_list[m_file_index],
+                                                 QCryptographicHash::Md5).toHex());
+            break;
+        case CMD_SET_OFFSET:
+            byte.append(m_cur_offset);
+            byte.append(m_cur_offset >> 8);
+            byte.append(m_cur_offset >> 16);
+            byte.append(m_cur_offset >> 24);
+            byte.append(m_cur_sum);
+            byte.append(m_cur_sum >> 8);
+            byte.append(m_cur_sum >> 16);
+            byte.append(m_cur_sum >> 24);
+            break;
+        case CMD_SET_PRN:
+            byte.append((char)m_device_prn);
+            break;
+        case CMD_GET_OFFSET:
+            break;
+        case CMD_SET_PROGRESS:
+            byte.append(m_total_file_size);
+            byte.append(m_total_file_size >> 8);
+            byte.append(m_total_file_size >> 16);
+            byte.append(m_total_file_size >> 24);
+            byte.append(QByteArray(4, 0));
+            break;
+        default:
+            break;
+        }
+    }
     WriteCharacteristic(m_characteristics, byte);
 }
 
 void Service::StartSendData()
 {
-    m_last_pack = false;
-    m_package_num = 0;
-    m_file_offset = 0;
-    m_check_sum = 0;
-
-    QByteArray byte;
-    byte.append(getFileType(m_file_index));
-    byte.append(m_file_data_list[m_file_index].size());
-    byte.append(m_file_data_list[m_file_index].size() >> 8);
-    byte.append(m_file_data_list[m_file_index].size() >> 16);
-    byte.append(m_file_data_list[m_file_index].size() >> 24);
-    byte.append((char)0x00);
-    byte.append(m_file_name_list[m_file_index]);
-    SendCmdKeyData(CMD_HEAD_OTA, CMD_SEND_START, byte);
+    StopSendData();
+    for (int i = 0; i < m_file_data_list[m_file_index].size(); i += m_device_mtu) {
+        //开始发送数据
+        m_file_offset = i + m_device_mtu;
+        m_package_num ++;
+        if (m_file_offset >= m_file_data_list[m_file_index].size()) {
+            //处理最后一包数据
+            m_last_pack = true;
+        }
+        QByteArray byte;
+        byte.append(CMD_HEAD_OTA);
+        byte.append(CMD_SEND_BODY);
+        byte.append((char)0x00);
+        QByteArray data = m_file_data_list[m_file_index].mid(i, m_device_mtu);
+        m_check_sum += CheckSum((uchar*)data.data(), data.size());
+        byte.append(data);
+        WriteCharacteristic(m_characteristics, byte);
+        if (m_package_num >= m_device_prn) {
+            WaitReplyData(5);
+            if (m_package_num) {
+                qDebug() << i << m_address << "recv d1 02 time out";
+//                        emit reconnectDevice();
+                emit upgradeResult(false, m_address);
+                break ;
+            }
+        }
+        if (m_last_pack) {
+            SendCmdKeyData(CMD_HEAD_OTA, CMD_SEND_END);
+        }
+    }
 }
 
 void Service::StopSendData()
 {
-    QByteArray byte;
-    byte.append(m_check_sum);
-    byte.append(m_check_sum >> 8);
-    byte.append(m_check_sum >> 16);
-    byte.append(m_check_sum >> 24);
-    byte.append(QCryptographicHash::hash(m_file_data_list[m_file_index],
-                                         QCryptographicHash::Md5).toHex());
-    SendCmdKeyData(CMD_HEAD_OTA, CMD_SEND_END, byte);
-}
-
-void Service::SetOffsetData()
-{
-    QByteArray byte;
-    byte.append(m_cur_offset);
-    byte.append(m_cur_offset >> 8);
-    byte.append(m_cur_offset >> 16);
-    byte.append(m_cur_offset >> 24);
-    byte.append(m_cur_sum);
-    byte.append(m_cur_sum >> 8);
-    byte.append(m_cur_sum >> 16);
-    byte.append(m_cur_sum >> 24);
-    SendCmdKeyData(CMD_HEAD_OTA, CMD_SET_OFFSET, byte);
+    m_last_pack = false;
+    m_package_num = 0;
+    m_file_offset = 0;
+    m_check_sum = 0;
 }
 
 uchar Service::getFileType(int index)
@@ -399,4 +423,20 @@ void Service::WaitReplyData(int secTimeout)
     QTimer::singleShot(secTimeout*1000, &eventloop, &QEventLoop::quit);
     connect(m_service, &QLowEnergyService::characteristicChanged, &eventloop, &QEventLoop::quit);
     eventloop.exec();
+}
+
+int Service::CompareVersion(const QByteArray &version1, const QByteArray &version2)
+{
+    QByteArrayList alist = version1.split('.');
+    QByteArrayList blist = version2.split('.');
+    int minLength = qMin(alist.size(), blist.size());
+    int idx = 0;
+    int diff = 0;
+    while (idx < minLength
+           && (diff = alist[idx].length() - blist[idx].length()) == 0
+           && (diff = alist[idx].compare(blist[idx])) == 0) {
+        ++ idx;
+    }
+    diff = (diff != 0) ? diff : alist.length() - blist.length();
+    return diff;
 }

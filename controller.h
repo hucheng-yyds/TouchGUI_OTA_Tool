@@ -13,7 +13,7 @@ public:
     explicit Controller(QObject *parent = nullptr);
     ~Controller();
 
-    void SetProperty(QByteArrayList &data, QByteArrayList &name, int size);
+    void SetProperty(QByteArrayList &data, QByteArrayList &name, int size, QByteArray &version);
     void ConnectDevice(const QBluetoothDeviceInfo &info);
     void DisconnectDevice(void);
 

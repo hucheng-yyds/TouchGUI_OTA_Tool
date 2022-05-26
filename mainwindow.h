@@ -23,6 +23,8 @@ public:
     MainWindow(QWidget *parent = nullptr);
     ~MainWindow();
 
+    void GetDirectoryFile(const QString &dirName);
+
 protected:
     bool eventFilter(QObject *obj, QEvent *ev) override;
 
@@ -46,7 +48,9 @@ private:
     QByteArrayList m_file_data_list;
     QByteArrayList m_file_name_list;
     int m_total_file_size = 0;
+    QByteArray m_version;
     QTimer *m_timer;
     int m_elapsed_second = 0;
+    QStringList m_address_list;
 };
 #endif // MAINWINDOW_H

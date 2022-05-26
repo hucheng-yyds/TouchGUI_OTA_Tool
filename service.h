@@ -7,6 +7,7 @@
 
 #define CMD_HEAD_PARAM  (uchar)0x02
 #define KEY_GET_INFO    (uchar)0x01
+#define KEY_GET_VER     (uchar)0x11
 #define KEY_GET_MTU     (uchar)0xF0
 
 #define CMD_HEAD_OTA    (uchar)0XD1
@@ -27,7 +28,7 @@ public:
         SendMessage("~Service");
     }
 
-    void SetProperty(QByteArrayList &data, QByteArrayList &name, int size);
+    void SetProperty(QByteArrayList &data, QByteArrayList &name, int size, QByteArray &version);
     void ConnectService(QLowEnergyService *, const QString &address);
     void SendMessage(QString);
     void OpenNotify(QLowEnergyCharacteristic ch, bool flag);
@@ -58,11 +59,11 @@ signals:
     void upgradeResult(bool success, const QString &address);
 
 private:
-    void SendCmdKeyData(const uchar cmd, const uchar key, QByteArray &byte);
+    void SendCmdKeyData(const uchar cmd, const uchar key);
     void StartSendData();
     void StopSendData();
-    void SetOffsetData();
     void WaitReplyData(int secTimeout);
+    int CompareVersion(const QByteArray &version1, const QByteArray &version2);
 
     QLowEnergyService * m_service;
     QLowEnergyCharacteristic m_characteristics;
@@ -71,6 +72,7 @@ private:
     QByteArrayList m_file_data_list;
     QByteArrayList m_file_name_list;
     int m_total_file_size = 0;
+    QByteArray m_version;
 
     int m_device_mtu = 241;
     int m_device_prn = 100;
