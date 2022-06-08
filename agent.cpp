@@ -53,6 +53,11 @@ bool Agent::isActive()
     return m_timer->isActive() || m_agent->isActive();
 }
 
+void Agent::setMatchStr(const QString &matchStr)
+{
+    m_match_str = matchStr;
+}
+
 void Agent::SendMessage(const QString &msg)
 {
     qDebug() << "Agent" << msg;
@@ -61,21 +66,22 @@ void Agent::SendMessage(const QString &msg)
 
 void Agent::onDeviceDiscovered(const QBluetoothDeviceInfo &info)
 {
-//    if (-1 == info.name().indexOf("realme Watch")
-//            || -1 == info.name().lastIndexOf("3295")) {
-//        return ;
-//    }
-    if (m_address_list.filter(
-                info.address().toString().right(5)
-                ,Qt::CaseInsensitive).isEmpty()) {
-        return ;
+    if (m_match_str.isEmpty()) {
+        if (m_address_list.filter(
+                    info.address().toString().right(5)
+                    ,Qt::CaseInsensitive).isEmpty()) {
+            return ;
+        }
+    } else {
+        if (-1 == info.name().indexOf(m_match_str)) {
+            return ;
+        }
     }
-
     emit deviceDiscovered(info);
     m_address_size ++;
     m_not_find = false;
     QString tmp = "发现设备:";
-    QString str = info.address().toString() + " - " + info.name() + QString::number(info.rssi());
+    QString str = info.address().toString() + " - " + info.name() + " rssi:" + QString::number(info.rssi());
     SendMessage(tmp + str);
 }
 

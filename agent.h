@@ -14,6 +14,7 @@ public:
     void startScanDevice(uint32_t timeOut, const QStringList &address);
     void stopScan();
     bool isActive();
+    void setMatchStr(const QString &matchStr);
 
 private:
     void SendMessage(const QString &);
@@ -34,7 +35,8 @@ private:
     int m_address_size = 0;
     int m_find_count = 0;
     bool m_not_find = true;
-    QTimer *m_timer;
+    QTimer *m_timer = nullptr;
+    QString m_match_str;
 };
 
 #endif // AGENT_H

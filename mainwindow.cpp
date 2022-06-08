@@ -49,6 +49,7 @@ MainWindow::MainWindow(QWidget *parent)
     ui->tableWidget_2->setColumnWidth(0, 200);
 #ifndef SAMPLE
     connect(agent, &Agent::deviceDiscovered, this, &MainWindow::onDeviceDiscovered);
+    connect(agent, &Agent::scanFinished, this, &MainWindow::onScanFinished);
     connect(m_timer, &QTimer::timeout, this, QOverload<>::of(&MainWindow::onUpdateTime));
 
     qDebug() << "main thread:" << QThread::currentThreadId();
@@ -235,6 +236,7 @@ void MainWindow::on_pushButton_4_clicked()
             return ;
         }
     }
+    agent->setMatchStr(ui->lineEdit_5->text());
     ui->label_32->setText(QString::number(m_address_list.size()));
     ui->label_40->setText(QString::number(m_address_list.size()));//目标总数
     ui->tabWidget->setCurrentIndex(4);
