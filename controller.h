@@ -1,7 +1,6 @@
 #ifndef CONTROLLER_H
 #define CONTROLLER_H
 
-#include <QThread>
 #include <QLowEnergyController>
 #include <QBluetoothDeviceInfo>
 #include "service.h"
@@ -20,7 +19,7 @@ public:
     QLowEnergyService *CreateService(QBluetoothUuid);
 
 private:
-    void SendMessage(QString);
+    void SendMessage(const QString &);
 
 private slots:
     void onConnected();
@@ -43,6 +42,7 @@ private:
     QLowEnergyController *m_controller = nullptr;
     QBluetoothDeviceInfo m_device_info;
     Service *m_service = nullptr;
+    int m_timeout_count = 3;
 };
 
 #endif // CONTROLLER_H

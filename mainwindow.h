@@ -24,6 +24,7 @@ public:
     ~MainWindow();
 
     void GetDirectoryFile(const QString &dirName);
+    QString buildDateTime() const;
 
 protected:
     bool eventFilter(QObject *obj, QEvent *ev) override;
@@ -32,9 +33,11 @@ private slots:
     void onDeviceDiscovered(const QBluetoothDeviceInfo &info);
     void onUpgradeResult(bool success, const QString &address);
     void onUpdateTime();
+    void onScanFinished();
     void on_pushButton_4_clicked();
-
     void on_pushButton_3_clicked();
+    void on_pushButton_6_clicked();
+
 signals:
     void ConnectDevice(const QBluetoothDeviceInfo &info);
 

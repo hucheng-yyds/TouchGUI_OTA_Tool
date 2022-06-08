@@ -4,6 +4,10 @@
 Agent::Agent(QObject *parent) : QObject(parent)
 {
     m_agent = new QBluetoothDeviceDiscoveryAgent(this);
+    m_timer = new QTimer(this);
+    connect(m_timer, &QTimer::timeout, this, [this]() {
+        m_agent->start(QBluetoothDeviceDiscoveryAgent::LowEnergyMethod);
+    });
 
     if(m_agent)
     {
@@ -22,10 +26,34 @@ void Agent::startScanDevice(uint32_t timeOut, const QStringList &address)
         m_agent->setLowEnergyDiscoveryTimeout(timeOut);
         m_agent->start(QBluetoothDeviceDiscoveryAgent::LowEnergyMethod);
         SendMessage("scanning...");
+        m_timer->start(10 * 1000 + timeOut);
+        int i = 0;
+        for (const auto &string : address) {
+            QBluetoothAddress mac(string);
+            if (mac.isNull()) {
+                continue ;
+            }
+            const QBluetoothDeviceInfo info(mac, "", 0);
+            emit deviceDiscovered(info);
+            if (++ i >= 7) {
+                break ;
+            }
+        }
     }
 }
 
-void Agent::SendMessage(QString msg)
+void Agent::stopScan()
+{
+    m_agent->stop();
+    m_timer->stop();
+}
+
+bool Agent::isActive()
+{
+    return m_timer->isActive() || m_agent->isActive();
+}
+
+void Agent::SendMessage(const QString &msg)
 {
     qDebug() << "Agent" << msg;
     emit message(msg);
@@ -44,8 +72,10 @@ void Agent::onDeviceDiscovered(const QBluetoothDeviceInfo &info)
     }
 
     emit deviceDiscovered(info);
+    m_address_size ++;
+    m_not_find = false;
     QString tmp = "发现设备:";
-    QString str = info.address().toString() + " - " + info.name();
+    QString str = info.address().toString() + " - " + info.name() + QString::number(info.rssi());
     SendMessage(tmp + str);
 }
 
@@ -53,7 +83,7 @@ void Agent::onError(QBluetoothDeviceDiscoveryAgent::Error err)
 {
     QString str;
 
-    str = QString("Agent Error(%1):").arg(err);
+    str = QString("Error(%1):").arg(err);
     str += m_agent->errorString();
 
     SendMessage(str);
@@ -61,7 +91,18 @@ void Agent::onError(QBluetoothDeviceDiscoveryAgent::Error err)
 
 void Agent::onFinished()
 {
-    SendMessage("Agent scan finished");
+    SendMessage("scan finished");
+    if (m_not_find) {
+        m_find_count ++;
+    } else {
+        m_find_count = 0;
+    }
+    if (m_address_size >= m_address_list.size() || m_find_count >= 6) {
+        m_timer->stop();
+        emit scanFinished();
+        SendMessage("scan stop");
+    }
+    m_not_find = true;
 //    const QList<QBluetoothDeviceInfo> foundDevices = m_agent->discoveredDevices();
 //    for (const auto &nextDevice : foundDevices) {
 //        for (const auto &str : qAsConst(m_address_list)) {

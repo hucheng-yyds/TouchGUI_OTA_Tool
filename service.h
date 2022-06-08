@@ -3,21 +3,31 @@
 
 #include <QObject>
 #include <QLowEnergyService>
-#include <QCryptographicHash>
+#include <QTime>
+#include <QThread>
 
-#define CMD_HEAD_PARAM  (uchar)0x02
-#define KEY_GET_INFO    (uchar)0x01
-#define KEY_GET_VER     (uchar)0x11
-#define KEY_GET_MTU     (uchar)0xF0
+#define CMD_HEAD_PARAM      (uchar)0x02
+#define PARAM_GET_INFO      (uchar)0x01
+#define PARAM_GET_VER       (uchar)0x11
+#define PARAM_GET_MTU       (uchar)0xF0
 
-#define CMD_HEAD_OTA    (uchar)0XD1
-#define CMD_SEND_START   (uchar)0x01
-#define CMD_SEND_BODY    (uchar)0x02
-#define CMD_SEND_END     (uchar)0x03
-#define CMD_SET_OFFSET   (uchar)0x04
-#define CMD_SET_PRN      (uchar)0x05
-#define CMD_GET_OFFSET   (uchar)0x06
-#define CMD_SET_PROGRESS (uchar)0x07
+#define CMD_HEAD_SETUP      (uchar)0x03
+#define SETUP_AUTH          (uchar)0xE7
+
+#define CMD_HEAD_OTA        (uchar)0XD1
+#define OTA_SEND_START      (uchar)0x01
+#define OTA_SEND_BODY       (uchar)0x02
+#define OTA_SEND_END        (uchar)0x03
+#define OTA_SET_OFFSET      (uchar)0x04
+#define OTA_SET_PRN         (uchar)0x05
+#define OTA_GET_OFFSET      (uchar)0x06
+#define OTA_SET_PROGRESS    (uchar)0x07
+#define CODE_SKIP_HEAD      (uchar)0x7F
+
+#define CMD_HEAD_SYSTEM     (uchar)0xF0
+#define SYSTEM_REBOOT       (uchar)0x01
+#define SYSTEM_DISCONNECT   (uchar)0x02
+#define SYSTEM_POWER_OFF    (uchar)0x03
 
 class Service : public QObject
 {
@@ -30,7 +40,7 @@ public:
 
     void SetProperty(QByteArrayList &data, QByteArrayList &name, int size, QByteArray &version);
     void ConnectService(QLowEnergyService *, const QString &address);
-    void SendMessage(QString);
+    void SendMessage(const QString &);
     void OpenNotify(QLowEnergyCharacteristic ch, bool flag);
     void ReadCharacteristic(QLowEnergyCharacteristic ch);
     void WriteCharacteristic(QLowEnergyCharacteristic ch, const QByteArray &arr);
@@ -55,7 +65,7 @@ private slots:
 signals:
     void message(QString);
     void discoveryCharacteristic(QLowEnergyCharacteristic);
-    void reconnectDevice();
+    void disconnectDevice();
     void upgradeResult(bool success, const QString &address);
 
 private:
@@ -74,6 +84,8 @@ private:
     int m_total_file_size = 0;
     QByteArray m_version;
 
+    bool m_last_pack = false;
+    bool m_set_offset = false;
     int m_device_mtu = 241;
     int m_device_prn = 100;
     int m_file_index = 0;
@@ -82,7 +94,6 @@ private:
     int m_package_num = 0;
     int m_check_sum = 0;
     int m_cur_sum = 0;
-    bool m_last_pack = false;
 };
 
 #endif // SERVICE_H

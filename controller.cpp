@@ -7,7 +7,7 @@ Controller::Controller(QObject *parent) : QObject(parent)
     moveToThread(m_thread);
     m_service->moveToThread(m_thread);
     connect(this, &Controller::serviceDiscovered, m_service, &Service::ConnectService);
-    connect(m_service, &Service::reconnectDevice, this, &Controller::onReconnectDevice);
+    connect(m_service, &Service::disconnectDevice, this, &Controller::DisconnectDevice);
     connect(m_service, &Service::upgradeResult, this, &Controller::upgradeResult);
     m_thread->start();
 }
@@ -37,11 +37,12 @@ void Controller::ConnectDevice(const QBluetoothDeviceInfo &info)
 {
     if(m_controller)
     {
-        SendMessage("disconnectFromDevice");
+        SendMessage(QString::number(m_timeout_count) + "disconnectFromDevice");
         m_controller->disconnectFromDevice();
         SendMessage("delete m_controller");
         delete m_controller;
         m_controller = NULL;
+        QThread::sleep(1);
     }
 
     m_device_info = info;
@@ -61,7 +62,7 @@ void Controller::ConnectDevice(const QBluetoothDeviceInfo &info)
 
 void Controller::DisconnectDevice()
 {
-    if(m_controller)
+    if(m_controller && QLowEnergyController::ConnectedState == m_controller->state())
     {
         m_controller->disconnectFromDevice();
     }
@@ -79,7 +80,7 @@ QLowEnergyService * Controller::CreateService(QBluetoothUuid serviceUUID)
     }
 }
 
-void Controller::SendMessage(QString str)
+void Controller::SendMessage(const QString &str)
 {
     if (m_controller) {
         qDebug() << "Controller:" << m_controller->remoteAddress().toString()
@@ -101,7 +102,12 @@ void Controller::onConnected()
 void Controller::onDisconnected()
 {
     SendMessage("device disconnected");
-    emit upgradeResult(false, m_controller->remoteAddress().toString());
+    if (m_timeout_count --) {
+        SendMessage("onReconnectDevice");
+        ConnectDevice(m_device_info);
+    } else {
+        emit upgradeResult(false, m_controller->remoteAddress().toString());
+    }
 }
 
 void Controller::onStateChanged(QLowEnergyController::ControllerState state)
@@ -132,6 +138,7 @@ void Controller::onError(QLowEnergyController::Error newError)
         str += m_controller->errorString();
 
         SendMessage(str);
+        DisconnectDevice();
     }
 }
 
@@ -140,7 +147,9 @@ void Controller::onServiceDiscovered(QBluetoothUuid serviceUUID)
     if (0x27f0 == serviceUUID.data1
             || 0x0af0 == serviceUUID.data1) {
         QLowEnergyService *service= CreateService(serviceUUID);
-        emit serviceDiscovered(service, m_controller->remoteAddress().toString());
+        if(m_controller) {
+            emit serviceDiscovered(service, m_controller->remoteAddress().toString());
+        }
     }
 }
 
@@ -165,6 +174,5 @@ void Controller::onConnectionUpdated(const QLowEnergyConnectionParameters &param
 
 void Controller::onReconnectDevice()
 {
-    SendMessage("onReconnectDevice");
-    ConnectDevice(m_device_info);
+
 }
