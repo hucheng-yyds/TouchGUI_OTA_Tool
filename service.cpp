@@ -45,7 +45,7 @@ void Service::ConnectService(QLowEnergyService * service, const QString &address
 
 void Service::SendMessage(const QString &msg)
 {
-    qDebug() << m_address.right(5) << QTime::currentTime().toString("hh:mm:ss:zzz") << msg;
+    qDebug() << m_address << QTime::currentTime().toString("hh:mm:ss:zzz") << msg;
     emit message(msg);
 }
 
@@ -196,7 +196,7 @@ void Service::onCharacteristicChanged(const QLowEnergyCharacteristic &info, cons
                     | ((value[8] & 0xFF) << 8)
                     | ((value[9] & 0xFF) << 16)
                     | ((value[10] & 0xFF) << 24);
-            qDebug() << m_address.right(5)
+            qDebug() << m_address
                      << "m_file_name:" << m_file_name_list[m_file_index]
                      << "m_file_size:" << m_file_data_list[m_file_index].size()
                      << "m_cur_sum:" << m_cur_sum

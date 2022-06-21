@@ -68,7 +68,7 @@ void Agent::onDeviceDiscovered(const QBluetoothDeviceInfo &info)
 {
     if (m_match_str.isEmpty()) {
         if (m_address_list.filter(
-                    info.address().toString().right(5)
+                    info.address().toString()
                     ,Qt::CaseInsensitive).isEmpty()) {
             return ;
         }

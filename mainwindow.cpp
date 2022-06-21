@@ -60,6 +60,11 @@ MainWindow::MainWindow(QWidget *parent)
         QTextStream in(&file);
         QString string;
         while (in.readLineInto(&string)) {
+            if (string.isEmpty()
+                    || string.indexOf("#")==0)
+            {
+                continue;
+            }
             qDebug() << string;
             if (!string.indexOf("dir:")) {
                 string.remove(0, 4);
