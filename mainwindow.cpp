@@ -54,7 +54,6 @@ MainWindow::MainWindow(QWidget *parent)
 
     qDebug() << "main thread:" << QThread::currentThreadId();
     ui->label_19->installEventFilter(this);
-//    agent->startScanDevice(10000, (QStringList()/*<<"3F:E1"*/<<"3D:D8"<<"57:E7"<<"6E:E9"<<"40:E8"));
     QFile file(QCoreApplication::applicationDirPath() + "/setup.txt");
     if (file.open(QIODevice::ReadWrite)) {
         QTextStream in(&file);
@@ -76,7 +75,10 @@ MainWindow::MainWindow(QWidget *parent)
                 ui->label_38->setText(string);
                 m_version = string.toUtf8();
                 m_version.resize(12);
-            } else {
+            } else if (!string.indexOf("queue:")){
+                string.remove(0, 6);
+                m_queuemax = string.toInt();
+            }else {
                 m_address_list.append(string);
             }
         }
@@ -155,11 +157,17 @@ void MainWindow::onDeviceDiscovered(const QBluetoothDeviceInfo &info)
 {
     if (!ui->tableWidget_2->findItems(info.address().toString()
                                       , Qt::MatchFixedString).empty()) {
-        qDebug() << "repeat connect";
+        qDebug() << info.address().toString() << "is already connecting";
         return ;
     }
-    if (controller_list.size() >= 7) {
-        qDebug() << "wait controller_list.size():" << controller_list.size();
+    if (!ui->listWidget->findItems(info.address().toString()
+                                      , Qt::MatchFixedString).empty()) {
+        qDebug() << info.address().toString() << "has already finished";
+        return ;
+    }
+    if (controller_list.size() >= m_queuemax) {
+        qDebug() << info.address().toString() << "can not connect"
+                 << "wait for idle, controller queue:" << controller_list.size();
         return ;
     }
 
@@ -193,10 +201,13 @@ void MainWindow::onUpgradeResult(bool success, const QString &address)
         if (success) {
             ui->listWidget->addItem(address);//添加到升级成功列表
             ui->label_33->setText(QString::number(ui->listWidget->count()));
+            m_successcount++;
+            agent->increaseSuccessCount();
         } else {
-            int failCount = ui->label_47->text().toInt();
-            qDebug() << "failCount:" << failCount;
-            ui->label_47->setText(QString::number(++failCount));//未完成数
+//            int failCount = ui->label_47->text().toInt();
+//            qDebug() << "failCount:" << failCount;
+//            ui->label_47->setText(QString::number(++failCount));//未完成数
+            m_failcount++;
         }
     }
     onScanFinished();
@@ -211,12 +222,17 @@ void MainWindow::onUpdateTime()
 
 void MainWindow::onScanFinished()
 {
-    if (controller_list.isEmpty() && !agent->isActive()) {//全部升级完成
+    if (!controller_list.isEmpty())
+    {
+        return;
+    }
+    if (m_successcount >= m_targetcount || !agent->isActive()) {//全部升级完成
         m_timer->stop();
         agent->stopScan();
         ui->tabWidget->setCurrentIndex(5);
         ui->label_46->setText(QString::number(ui->listWidget->count()));//已完成数
         ui->label_49->setText(ui->label_34->text());//总耗时
+        ui->label_47->setText(QString::number(m_targetcount-m_successcount));//未完成数
         double hourCount = ui->listWidget->count() / (m_elapsed_second / 3600.00);
         qDebug() << "hourCount:" << hourCount << m_elapsed_second << ui->listWidget->count();
         ui->label_48->setText(QString::number(hourCount, 'f', 0)+" units/hour");//平均速度
@@ -241,9 +257,16 @@ void MainWindow::on_pushButton_4_clicked()
             return ;
         }
     }
+    m_targetcount = ui->lineEdit_4->text().toInt();
+    if (m_targetcount < 1)
+    {
+        m_targetcount = m_address_list.size();
+    }
+    qDebug() << "Target count:" << m_targetcount;
+    agent->setTargetCount(m_targetcount);
     agent->setMatchStr(ui->lineEdit_5->text());
-    ui->label_32->setText(QString::number(m_address_list.size()));
-    ui->label_40->setText(QString::number(m_address_list.size()));//目标总数
+    ui->label_32->setText(QString::number(m_targetcount));
+    ui->label_40->setText(QString::number(m_targetcount));//目标总数
     ui->tabWidget->setCurrentIndex(4);
     m_timer->start(1000);
     ui->pushButton_4->setEnabled(false);

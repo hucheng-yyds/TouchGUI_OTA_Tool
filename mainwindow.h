@@ -55,5 +55,10 @@ private:
     QTimer *m_timer;
     int m_elapsed_second = 0;
     QStringList m_address_list;
+
+    int m_targetcount = 0;
+    int m_successcount = 0;
+    int m_failcount = 0;
+    int m_queuemax = 7;
 };
 #endif // MAINWINDOW_H

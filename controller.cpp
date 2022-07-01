@@ -17,7 +17,7 @@ Controller::~Controller()
     m_thread->quit();
     SendMessage("~Controller");
     m_thread->wait();
-    delete m_thread;
+    //delete m_thread;
     delete m_service;
     m_service = nullptr;
     if(m_controller)

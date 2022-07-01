@@ -36,7 +36,7 @@ void Service::ConnectService(QLowEnergyService * service, const QString &address
             connect(m_service, SIGNAL(descriptorRead(QLowEnergyDescriptor, QByteArray)), this, SLOT(onDescriptorRead(QLowEnergyDescriptor, QByteArray)));
             connect(m_service, SIGNAL(descriptorWritten(QLowEnergyDescriptor, QByteArray)), this, SLOT(onDescriptorWritten(QLowEnergyDescriptor, QByteArray)));
             connect(m_service, SIGNAL(error(QLowEnergyService::ServiceError)), this, SLOT(onError(QLowEnergyService::ServiceError)));
-            QThread::msleep(300);
+            QThread::msleep(1000);
             SendMessage("discoverDetails:" + QString::number(m_service->state()));
             m_service->discoverDetails();
         }
@@ -90,7 +90,8 @@ void Service::ReadCharacteristic(QLowEnergyCharacteristic ch)
 
 void Service::WriteCharacteristic(QLowEnergyCharacteristic ch, const QByteArray &arr)
 {
-//    qDebug() << __FUNCTION__ << arr.left(10).toHex('|');
+//    qDebug() << m_address << QTime::currentTime().toString("hh:mm:ss:zzz")
+//             << "Write Characteristic: " << arr.left(10).toHex('|');
     if(m_service)
     {
         if(ch.isValid())
@@ -197,6 +198,7 @@ void Service::onCharacteristicChanged(const QLowEnergyCharacteristic &info, cons
                     | ((value[9] & 0xFF) << 16)
                     | ((value[10] & 0xFF) << 24);
             qDebug() << m_address
+                     << QTime::currentTime().toString("hh:mm:ss:zzz")
                      << "m_file_name:" << m_file_name_list[m_file_index]
                      << "m_file_size:" << m_file_data_list[m_file_index].size()
                      << "m_cur_sum:" << m_cur_sum
@@ -205,12 +207,14 @@ void Service::onCharacteristicChanged(const QLowEnergyCharacteristic &info, cons
                      << "m_file_offset:" << m_file_offset;
             if (CODE_SKIP_HEAD == value[2]) {
                 m_set_offset = true;
+                //sinal
+                SendMessage("CODE_SKIP_HEAD");
                 SendCmdKeyData(CMD_HEAD_OTA, OTA_SET_OFFSET);
             }
             if (m_check_sum == m_cur_sum) {//校验客户端与设备的checksum
                 m_package_num = 0;
             } else {
-                SendMessage("fail: OTA_SEND_BODY");
+                SendMessage("check sum fail");
                 emit disconnectDevice();
             }
             break;
@@ -220,7 +224,7 @@ void Service::onCharacteristicChanged(const QLowEnergyCharacteristic &info, cons
                 m_file_index ++;
                 if (m_file_index >= m_file_data_list.size()) {
                     SendCmdKeyData(CMD_HEAD_SYSTEM, SYSTEM_POWER_OFF);
-                    SendCmdKeyData(CMD_HEAD_SYSTEM, SYSTEM_REBOOT);
+//                    SendCmdKeyData(CMD_HEAD_SYSTEM, SYSTEM_REBOOT);
                     emit upgradeResult(true, m_address);
                     break;
                 }
@@ -400,15 +404,36 @@ void Service::StartSendData()
         byte.append(data);
         WriteCharacteristic(m_characteristics, byte);
         if (m_package_num >= m_device_prn) {
-            WaitReplyData(5);
-            if (m_set_offset) {
-                WaitReplyData(5);
-                i = m_cur_offset - m_device_mtu;
-            }
-            if (m_package_num) {
-                qDebug() << i << m_address << "recv d1 02 time out";
+//            WaitReplyData(5);
+//            if (m_set_offset) {
+//                WaitReplyData(5);
+//                i = m_cur_offset - m_device_mtu;
+//            }
+//            if (m_package_num) {
+//                qDebug() << i << m_address << "recv d1 02 time out";
+//                emit disconnectDevice();
+//                break ;
+//            }
+            if (!WaitReplyData2(5))
+            {
+                qDebug() << i << m_address
+                         << QTime::currentTime().toString("hh:mm:ss:zzz")
+                         << "recv d1 02 time out";
                 emit disconnectDevice();
                 break ;
+            }
+
+            if (m_set_offset) {
+                if (!WaitReplyData2(5))
+                {
+                    qDebug() << i << m_address
+                             << QTime::currentTime().toString("hh:mm:ss:zzz")
+                             << "recv d1 02 time out";
+                    emit disconnectDevice();
+                    break ;
+                }
+                i = m_cur_offset - m_device_mtu;
+                m_set_offset = false;
             }
         }
         if (m_last_pack) {
@@ -427,7 +452,7 @@ void Service::StopSendData()
 
 uchar Service::getFileType(int index)
 {
-    uchar c = 0;
+    uchar c = 0xff;
     switch (index) {
     case 0:
         c = 0x23;
@@ -452,6 +477,23 @@ void Service::WaitReplyData(int secTimeout)
     QTimer::singleShot(secTimeout * 1000, &eventloop, &QEventLoop::quit);
     connect(m_service, &QLowEnergyService::characteristicChanged, &eventloop, &QEventLoop::quit);
     eventloop.exec();
+}
+
+bool Service::WaitReplyData2(int secTimeout)
+{
+    bool reply_succ = true;
+
+    QEventLoop eventloop;
+    connect(m_service, &QLowEnergyService::characteristicChanged, &eventloop, &QEventLoop::quit);
+
+    QTimer timer;
+    timer.setSingleShot(true);
+    connect(&timer, &QTimer::timeout, [&eventloop,&reply_succ]{reply_succ=false; eventloop.quit();});
+    timer.start(secTimeout * 1000);
+
+    eventloop.exec();
+    timer.stop();
+    return reply_succ;
 }
 
 int Service::CompareVersion(const QByteArray &version1, const QByteArray &version2)
