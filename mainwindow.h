@@ -15,6 +15,7 @@ class Agent;
 class Controller;
 class Service;
 class Device;
+class HttpsClient;
 class MainWindow : public QMainWindow
 {
     Q_OBJECT
@@ -38,6 +39,10 @@ private slots:
     void on_pushButton_3_clicked();
     void on_pushButton_6_clicked();
 
+    void on_pushButton_clicked();
+
+    void on_pushButton_2_clicked();
+
 signals:
     void ConnectDevice(const QBluetoothDeviceInfo &info);
 
@@ -47,6 +52,7 @@ private:
 //    Controller *controller;
 //    Service *service;
     Device *device;
+    HttpsClient *https;
     QList<Controller *> controller_list;
     QByteArrayList m_file_data_list;
     QByteArrayList m_file_name_list;

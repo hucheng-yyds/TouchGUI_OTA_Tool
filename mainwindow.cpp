@@ -4,6 +4,7 @@
 #include "controller.h"
 #include "service.h"
 #include "device.h"
+#include "httpsclient.h"
 #include <QFile>
 #include <QDir>
 #include <QFileDialog>
@@ -14,6 +15,7 @@ MainWindow::MainWindow(QWidget *parent)
     : QMainWindow(parent)
     , ui(new Ui::MainWindow)
     , agent(new Agent(this))
+    , https(new HttpsClient(this))
     , m_timer(new QTimer(this))
 {
     ui->setupUi(this);
@@ -47,6 +49,7 @@ MainWindow::MainWindow(QWidget *parent)
     setStyleSheet(qss);
     setWindowTitle("OTA升级工具" + buildDateTime());
     ui->tableWidget_2->setColumnWidth(0, 200);
+    ui->tableWidget->setColumnHidden(0, true);
 #ifndef SAMPLE
     connect(agent, &Agent::deviceDiscovered, this, &MainWindow::onDeviceDiscovered);
     connect(agent, &Agent::scanFinished, this, &MainWindow::onScanFinished);
@@ -54,18 +57,16 @@ MainWindow::MainWindow(QWidget *parent)
 
     qDebug() << "main thread:" << QThread::currentThreadId();
     ui->label_19->installEventFilter(this);
+    ui->label_52->installEventFilter(this);
     QFile file(QCoreApplication::applicationDirPath() + "/setup.txt");
     if (file.open(QIODevice::ReadWrite)) {
         QTextStream in(&file);
         QString string;
         while (in.readLineInto(&string)) {
-            if (string.isEmpty()
-                    || string.indexOf("#")==0)
-            {
-                continue;
-            }
-            qDebug() << string;
-            if (!string.indexOf("dir:")) {
+            if (!string.indexOf("#")
+                    || string.isEmpty()) {
+                continue ;
+            } else if (!string.indexOf("dir:")) {
                 string.remove(0, 4);
                 ui->label_19->setText(string);
             } else if (!string.indexOf("ver:")) {
@@ -81,6 +82,7 @@ MainWindow::MainWindow(QWidget *parent)
             }else {
                 m_address_list.append(string);
             }
+            qDebug() << string;
         }
         file.close();
     }
@@ -147,7 +149,14 @@ bool MainWindow::eventFilter(QObject *obj, QEvent *ev)
                                                             | QFileDialog::DontResolveSymlinks);
         GetDirectoryFile(dirName);
         return true;
-    }  else {
+    } else if (ui->label_52 == obj
+               && ev->type() == QEvent::MouseButtonPress) {
+        if (https->verificationCode() < 0) {
+            QMessageBox::information(this, "提示", "验证码获取fail", QMessageBox::NoButton);
+        }
+        ui->label_52->setPixmap(QPixmap(QString::fromUtf8("a.jpg")));
+        return true;
+    } else {
         // pass the event on to the parent class
         return QMainWindow::eventFilter(obj, ev);
     }
@@ -245,14 +254,11 @@ void MainWindow::on_pushButton_4_clicked()
 #ifndef SAMPLE
 //    agent->startScanDevice(10000, (QStringList()<<"3D:D8"<<"3F:E1"<<"57:E7"<<"6E:E9"<<"40:E8"));
     if (0 == m_total_file_size) {
-        QMessageBox::information(this, "提示",
-                                 "请检查升级包!",
-                                 QMessageBox::NoButton);
+        QMessageBox::information(this, "提示", "请检查升级包!", QMessageBox::NoButton);
         return ;
     }
     if (ui->label_20->text().isEmpty()) {
-        if (QMessageBox::question(this, "提示",
-                                  "版本号为空，确定要升级吗?")
+        if (QMessageBox::question(this, "提示", "版本号为空，确定要升级吗?")
                 == QMessageBox::No) {
             return ;
         }
@@ -290,6 +296,7 @@ void MainWindow::on_pushButton_6_clicked()
     ui->tableWidget_2->clearContents();
     ui->tableWidget_2->setRowCount(0);
     ui->listWidget->clear();
+    m_timer->stop();
     agent->stopScan();
 //    for (auto &cont : controller_list) {
 //        delete cont;
@@ -301,5 +308,69 @@ void MainWindow::on_pushButton_6_clicked()
 #else
     device->disconnectFromDevice();
 #endif
+}
+
+
+void MainWindow::on_pushButton_clicked()
+{
+    if (ui->lineEdit->text().isEmpty() || ui->lineEdit_2->text().isEmpty()) {
+        return ;
+    }
+    int ret = https->login(ui->lineEdit->text(), ui->lineEdit_2->text(), ui->lineEdit_3->text());
+    if (ret < 0) {
+        QMessageBox::information(this, "提示", "登录失败", QMessageBox::NoButton);
+        return ;
+    }
+    QList<QStringList> stringList;
+    ret = https->upgradePackageList(stringList);
+    if (ret < 0) {
+        QMessageBox::question(this, "提示", "获取列表失败", QMessageBox::Retry | QMessageBox::Cancel);
+        return;
+    }
+//    QList<QStringList> stringList;
+//    stringList.append(QStringList() << "11" << "3.2.0"<< ""<< "");
+//    stringList.append(QStringList() << "22" << ""<< ""<< "");
+    ui->tableWidget->clearContents();
+    ui->tableWidget->setRowCount(0);
+    qDebug() << "stringList:" << stringList.size();
+    ui->tabWidget->setCurrentIndex(1);
+    for (auto &list : stringList) {
+        int column = 2;
+        int rowCount = ui->tableWidget->rowCount();
+        ui->tableWidget->insertRow(rowCount);
+        ui->tableWidget->setItem(rowCount, 0, new QTableWidgetItem(list.value(0)));
+        list.removeFirst();
+        for (auto &string : list) {
+            qDebug() << rowCount << column << string;
+            ui->tableWidget->setItem(rowCount, column ++, new QTableWidgetItem(string));
+        }
+        qDebug() << "OTAID:" << ui->tableWidget->item(rowCount, 0)->text();
+    }
+}
+
+
+void MainWindow::on_pushButton_2_clicked()
+{
+    int currentRow = ui->tableWidget->currentRow();
+    qDebug() << currentRow;
+    if (currentRow >= 0) {
+        ui->tabWidget->setCurrentIndex(3);
+        if (nullptr == ui->tableWidget->item(currentRow, 0)
+                || nullptr == ui->tableWidget->item(currentRow, 2)) {
+            return ;
+        }
+        int custOtaId = ui->tableWidget->item(currentRow, 0)->text().toInt();
+        QString version = ui->tableWidget->item(currentRow, 2)->text();
+
+        qDebug() << "custOtaId:" << custOtaId << "version:" << version;
+        if (https->downloadPackage(custOtaId) < 0) {
+            qDebug() << "download fail";
+            return ;
+        }
+        ui->label_20->setText(version);
+        ui->label_31->setText(version);
+        ui->label_38->setText(version);
+        m_version = version.toUtf8();
+    }
 }
 

@@ -1,4 +1,4 @@
-QT       += core gui bluetooth
+QT       += core gui bluetooth network
 WIN32:
 CONFIG += console
 
@@ -16,6 +16,7 @@ SOURCES += \
     controller.cpp \
     device.cpp \
     deviceinfo.cpp \
+    httpsclient.cpp \
     main.cpp \
     mainwindow.cpp \
     service.cpp \
@@ -27,6 +28,7 @@ HEADERS += \
     controller.h \
     device.h \
     deviceinfo.h \
+    httpsclient.h \
     mainwindow.h \
     service.h \
     serviceinfo.h

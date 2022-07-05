@@ -18,7 +18,7 @@
     <item>
      <widget class="QTabWidget" name="tabWidget">
       <property name="currentIndex">
-       <number>3</number>
+       <number>0</number>
       </property>
       <widget class="QWidget" name="tab">
        <attribute name="title">
@@ -87,6 +87,9 @@
             <pointsize>15</pointsize>
            </font>
           </property>
+          <property name="text">
+           <string>cloud</string>
+          </property>
          </widget>
         </item>
         <item>
@@ -116,6 +119,9 @@
             <pointsize>15</pointsize>
            </font>
           </property>
+          <property name="text">
+           <string>123456</string>
+          </property>
           <property name="echoMode">
            <enum>QLineEdit::Password</enum>
           </property>
@@ -135,20 +141,37 @@
          </widget>
         </item>
         <item>
-         <widget class="QLineEdit" name="lineEdit_3">
-          <property name="minimumSize">
-           <size>
-            <width>0</width>
-            <height>40</height>
-           </size>
-          </property>
-          <property name="font">
-           <font>
-            <family>Microsoft YaHei UI</family>
-            <pointsize>15</pointsize>
-           </font>
-          </property>
-         </widget>
+         <layout class="QHBoxLayout" name="horizontalLayout_4">
+          <item>
+           <widget class="QLineEdit" name="lineEdit_3">
+            <property name="minimumSize">
+             <size>
+              <width>0</width>
+              <height>40</height>
+             </size>
+            </property>
+            <property name="font">
+             <font>
+              <family>Microsoft YaHei UI</family>
+              <pointsize>15</pointsize>
+             </font>
+            </property>
+           </widget>
+          </item>
+          <item>
+           <widget class="QLabel" name="label_52">
+            <property name="minimumSize">
+             <size>
+              <width>78</width>
+              <height>37</height>
+             </size>
+            </property>
+            <property name="pixmap">
+             <pixmap>../build-TouchGUI_OTA_Tool-Desktop_Qt_5_15_2_MSVC2019_64bit-Debug/a.jpg</pixmap>
+            </property>
+           </widget>
+          </item>
+         </layout>
         </item>
         <item>
          <spacer name="verticalSpacer">
@@ -213,6 +236,11 @@
         </item>
         <item>
          <widget class="QTableWidget" name="tableWidget">
+          <column>
+           <property name="text">
+            <string>OTAID</string>
+           </property>
+          </column>
           <column>
            <property name="text">
             <string>升级包名称</string>
