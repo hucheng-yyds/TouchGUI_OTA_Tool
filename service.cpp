@@ -1,12 +1,14 @@
 #include "service.h"
-#include <QElapsedTimer>
+#include <QTime>
 #include <QTimer>
-#include <QEventLoop>
 #include <QCryptographicHash>
 
 Service::Service(QObject *parent) : QObject(parent)
+  , m_eventloop(new QEventLoop(this))
+  , m_timer(new QTimer(this))
 {
     m_service = NULL;
+    m_timer->setSingleShot(true);
 }
 
 void Service::SetProperty(QByteArrayList &data, QByteArrayList &name, int size, QByteArray &version)
@@ -29,6 +31,8 @@ void Service::ConnectService(QLowEnergyService * service, const QString &address
         }
         else if (m_service->state() == QLowEnergyService::DiscoveryRequired)
         {
+            connect(m_timer, &QTimer::timeout, m_eventloop, &QEventLoop::quit);
+            connect(m_service, &QLowEnergyService::characteristicChanged, m_eventloop, &QEventLoop::quit);
             connect(m_service, SIGNAL(stateChanged(QLowEnergyService::ServiceState)), this, SLOT(onStateChanged(QLowEnergyService::ServiceState)));
             connect(m_service, SIGNAL(characteristicChanged(QLowEnergyCharacteristic, QByteArray)), this, SLOT(onCharacteristicChanged(QLowEnergyCharacteristic, QByteArray)));
             connect(m_service, SIGNAL(characteristicRead(QLowEnergyCharacteristic, QByteArray)), this, SLOT(onCharacteristicRead(QLowEnergyCharacteristic, QByteArray)));
@@ -36,7 +40,7 @@ void Service::ConnectService(QLowEnergyService * service, const QString &address
             connect(m_service, SIGNAL(descriptorRead(QLowEnergyDescriptor, QByteArray)), this, SLOT(onDescriptorRead(QLowEnergyDescriptor, QByteArray)));
             connect(m_service, SIGNAL(descriptorWritten(QLowEnergyDescriptor, QByteArray)), this, SLOT(onDescriptorWritten(QLowEnergyDescriptor, QByteArray)));
             connect(m_service, SIGNAL(error(QLowEnergyService::ServiceError)), this, SLOT(onError(QLowEnergyService::ServiceError)));
-            QThread::msleep(300);
+            QThread::msleep(500);
             SendMessage("discoverDetails:" + QString::number(m_service->state()));
             m_service->discoverDetails();
         }
@@ -90,7 +94,6 @@ void Service::ReadCharacteristic(QLowEnergyCharacteristic ch)
 
 void Service::WriteCharacteristic(QLowEnergyCharacteristic ch, const QByteArray &arr)
 {
-//    qDebug() << __FUNCTION__ << arr.left(10).toHex('|');
     if(m_service)
     {
         if(ch.isValid())
@@ -182,6 +185,14 @@ void Service::onCharacteristicChanged(const QLowEnergyCharacteristic &info, cons
         case OTA_SEND_START:
             if (0 == value[2]) {
                 SendCmdKeyData(CMD_HEAD_OTA, OTA_SET_PRN);
+            } else if (CODE_SKIP_FILE == value[2]) {
+                m_file_index ++;
+                if (m_file_index < m_file_data_list.size()) {
+                    SendMessage("CODE_SKIP_FILE: " + m_file_name_list[m_file_index]);
+                    SendCmdKeyData(CMD_HEAD_OTA, OTA_SEND_START);
+                } else {
+                    emit upgradeResult(true, m_address);
+                }
             } else {
                 SendMessage("fail: OTA_SEND_START");
                 emit disconnectDevice();
@@ -377,6 +388,7 @@ void Service::SendCmdKeyData(const uchar cmd, const uchar key)
         byte.append(0x02);
         byte.append((char)0x00);
     }
+    SendMessage("SendCmdKeyData " + byte.left(10).toHex('|'));
     WriteCharacteristic(m_characteristics, byte);
 }
 
@@ -384,11 +396,9 @@ void Service::StartSendData()
 {
     StopSendData();
     for (int i = 0; i < m_file_data_list[m_file_index].size(); i += m_device_mtu) {
-        //开始发送数据
         m_file_offset = i + m_device_mtu;
         m_package_num ++;
-        if (m_file_offset >= m_file_data_list[m_file_index].size()) {
-            //处理最后一包数据
+        if (m_file_offset >= m_file_data_list[m_file_index].size()) {//dealt last package
             m_last_pack = true;
         }
         QByteArray byte;
@@ -400,25 +410,34 @@ void Service::StartSendData()
         byte.append(data);
         WriteCharacteristic(m_characteristics, byte);
         if (m_package_num >= m_device_prn) {
-            WaitReplyData(5);
-            if (m_set_offset) {
-                WaitReplyData(5);
-                i = m_cur_offset - m_device_mtu;
-            }
-            if (m_package_num) {
-                qDebug() << i << m_address << "recv d1 02 time out";
+            if (WaitReplyData(5)) {
+                if (m_set_offset) {
+                    if (WaitReplyData(5)) {
+                        i = m_cur_offset - m_device_mtu;
+                        SendMessage("m_set_offset true");
+                    } else {
+                        SendMessage("recv d1 04 time out");
+                        emit disconnectDevice();
+                        break ;
+                    }
+                }
+            } else {
+                SendMessage("recv d1 02 time out");
                 emit disconnectDevice();
                 break ;
             }
         }
         if (m_last_pack) {
+            SendMessage("m_last_pack true");
             SendCmdKeyData(CMD_HEAD_OTA, OTA_SEND_END);
+            break ;
         }
     }
 }
 
 void Service::StopSendData()
 {
+    SendMessage("StopSendData");
     m_last_pack = false;
     m_package_num = 0;
     m_file_offset = 0;
@@ -446,12 +465,30 @@ uchar Service::getFileType(int index)
     return c;
 }
 
-void Service::WaitReplyData(int secTimeout)
+bool Service::WaitReplyData(int secTimeout)
 {
+    bool flag = false;
+#if 0
+    QTimer timer;
     QEventLoop eventloop;
-    QTimer::singleShot(secTimeout * 1000, &eventloop, &QEventLoop::quit);
+    connect(&timer, &QTimer::timeout, &eventloop, &QEventLoop::quit);
     connect(m_service, &QLowEnergyService::characteristicChanged, &eventloop, &QEventLoop::quit);
+    timer.setSingleShot(true);
+    timer.start(secTimeout * 1000);
     eventloop.exec();
+    if (timer.isActive()) {
+        flag = true;
+    }
+    timer.stop();
+#else
+    m_timer->start(secTimeout * 1000);
+    m_eventloop->exec();
+    if (m_timer->isActive()) {
+        flag = true;
+    }
+    m_timer->stop();
+#endif
+    return flag;
 }
 
 int Service::CompareVersion(const QByteArray &version1, const QByteArray &version2)

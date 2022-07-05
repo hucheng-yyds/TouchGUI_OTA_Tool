@@ -3,7 +3,7 @@
 
 #include <QObject>
 #include <QLowEnergyService>
-#include <QTime>
+#include <QEventLoop>
 #include <QThread>
 
 #define CMD_HEAD_PARAM      (uchar)0x02
@@ -22,6 +22,8 @@
 #define OTA_SET_PRN         (uchar)0x05
 #define OTA_GET_OFFSET      (uchar)0x06
 #define OTA_SET_PROGRESS    (uchar)0x07
+//status code
+#define CODE_SKIP_FILE      (uchar)0x7E
 #define CODE_SKIP_HEAD      (uchar)0x7F
 
 #define CMD_HEAD_SYSTEM     (uchar)0xF0
@@ -72,12 +74,14 @@ private:
     void SendCmdKeyData(const uchar cmd, const uchar key);
     void StartSendData();
     void StopSendData();
-    void WaitReplyData(int secTimeout);
+    bool WaitReplyData(int secTimeout);
     int CompareVersion(const QByteArray &version1, const QByteArray &version2);
 
     QLowEnergyService * m_service;
     QLowEnergyCharacteristic m_characteristics;
     QString m_address;
+    QEventLoop *m_eventloop;
+    QTimer *m_timer;
 
     QByteArrayList m_file_data_list;
     QByteArrayList m_file_name_list;
