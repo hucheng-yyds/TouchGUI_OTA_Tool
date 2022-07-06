@@ -75,6 +75,7 @@ private:
     void StartSendData();
     void StopSendData();
     bool WaitReplyData(int secTimeout);
+    bool WaitReplyData2(int secTimeout);
     int CompareVersion(const QByteArray &version1, const QByteArray &version2);
 
     QLowEnergyService * m_service;

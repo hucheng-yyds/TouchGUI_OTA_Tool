@@ -27,18 +27,18 @@ void Agent::startScanDevice(uint32_t timeOut, const QStringList &address)
         m_agent->start(QBluetoothDeviceDiscoveryAgent::LowEnergyMethod);
         SendMessage("scanning...");
         m_timer->start(10 * 1000 + timeOut);
-        int i = 0;
-        for (const auto &string : address) {
-            QBluetoothAddress mac(string);
-            if (mac.isNull()) {
-                continue ;
-            }
-            const QBluetoothDeviceInfo info(mac, "", 0);
-            emit deviceDiscovered(info);
-            if (++ i >= 7) {
-                break ;
-            }
-        }
+//        int i = 0;
+//        for (const auto &string : address) {
+//            QBluetoothAddress mac(string);
+//            if (mac.isNull()) {
+//                continue ;
+//            }
+//            const QBluetoothDeviceInfo info(mac, "", 0);
+//            emit deviceDiscovered(info);
+//            if (++ i >= 7) {
+//                break ;
+//            }
+//        }
     }
 }
 
@@ -103,7 +103,7 @@ void Agent::onFinished()
     } else {
         m_find_count = 0;
     }
-    if (m_address_size >= m_address_list.size() || m_find_count >= 6) {
+    if (m_successcount >= m_targetcount || m_find_count >= 6) {
         m_timer->stop();
         emit scanFinished();
         SendMessage("scan stop");

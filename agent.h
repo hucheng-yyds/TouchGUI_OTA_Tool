@@ -15,6 +15,9 @@ public:
     void stopScan();
     bool isActive();
     void setMatchStr(const QString &matchStr);
+    void setTargetCount(int targetcount){m_targetcount=targetcount;}
+    void setSuccessCount(int successcount){m_successcount=successcount;}
+    void increaseSuccessCount(){m_successcount++;}
 
 private:
     void SendMessage(const QString &);
@@ -37,6 +40,9 @@ private:
     bool m_not_find = true;
     QTimer *m_timer = nullptr;
     QString m_match_str;
+
+    int m_targetcount = 0;
+    int m_successcount = 0;
 };
 
 #endif // AGENT_H

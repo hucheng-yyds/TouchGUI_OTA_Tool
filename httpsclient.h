@@ -20,7 +20,7 @@ public:
     int verificationCode();
     int login(const QString &name, const QString &password, const QString &verifyCode);
     int upgradePackageList(QList<QStringList> &stringList);
-    int downloadPackage(const int custOtaId);
+    int downloadPackage(const int custOtaId, QString &filename);
 
 private:
     void networkRequest(RequestType reqType, const QString &url, QByteArray &data,

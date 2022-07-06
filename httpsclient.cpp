@@ -5,7 +5,7 @@
 #include <QJsonArray>
 
 #if 1
-#define SERVER_ADDRESS  "http://47.243.45.185:8966/"
+#define SERVER_ADDRESS  "http://47.243.45.185:8988/"
 #else
 #define SERVER_ADDRESS  "http://192.168.20.134:8080/"
 #endif
@@ -94,7 +94,7 @@ int HttpsClient::upgradePackageList(QList<QStringList> &stringList)
     return -1;
 }
 
-int HttpsClient::downloadPackage(const int custOtaId)
+int HttpsClient::downloadPackage(const int custOtaId, QString &filename)
 {
     QByteArray data;
     const QString &url = "touchlink/customer/ota/tool/downloadOTA/" + QString::number(custOtaId);
@@ -109,9 +109,10 @@ int HttpsClient::downloadPackage(const int custOtaId)
     file.open(QIODevice::ReadWrite);
     file.write(data);
     file.close();
-    QByteArrayList dirname = m_filename.split('.');
-    system("mkdir " + dirname.value(0)); // del /f /s /q  ota\*
-    system("tar -xvf " + m_filename + " -C %cd%/" + dirname.value(0));
+    QByteArray dirname = m_filename.chopped(4);
+    system("mkdir " + dirname); // del /f /s /q  ota\*
+    system("tar -xvf " + m_filename + " -C %cd%/" + dirname);
+    filename = dirname;
     return 0;
 }
 
