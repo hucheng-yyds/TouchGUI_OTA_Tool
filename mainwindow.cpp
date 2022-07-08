@@ -181,10 +181,6 @@ void MainWindow::keyPressEvent(QKeyEvent *keyValue)
             m_barStr = ui->lineEdit_4->text();
         }
         QStringList strlist = m_barStr.split("MAC:");
-//        qDebug() << "QrCode:" << strlist;
-        QFile file("mac.txt");
-        file.open(QIODevice::WriteOnly);
-        QTextStream out(&file);
         for (int i = 1; i < strlist.size(); i ++) {
             bool ok = false;
             //there are two mac address formats
@@ -205,12 +201,18 @@ void MainWindow::keyPressEvent(QKeyEvent *keyValue)
                 continue;
             }
             qDebug() << macStr;
-            out << macStr << '\n';
             m_address_list << macStr;
         }
         m_address_list.removeDuplicates();
         m_targetcount = m_address_list.size();
         ui->lineEdit_4->setText(QString::number(m_targetcount));
+        QFile file("mac.txt");
+        file.open(QIODevice::WriteOnly);
+        QTextStream out(&file);
+        for (auto & m : m_address_list)
+        {
+            out << m << '\n';
+        }
         file.close();
         m_barStr.clear();
     }
@@ -234,6 +236,7 @@ void MainWindow::onDeviceDiscovered(const QBluetoothDeviceInfo &info)
     if (controller_list.size() >= m_queuemax) {
         qInfo() << info.address().toString() << "can not connect"
                  << "wait for idle, controller queue:" << controller_list.size();
+        stopAgentScan();
         return ;
     }
 
@@ -264,11 +267,19 @@ void MainWindow::onUpgradeResult(bool success, const QString &address)
         qInfo() << address << "upgrade result:" << success;
         delete controller_list[index];
         controller_list.removeAt(index);
+        startAgentScan();
         if (success) {
             ui->listWidget->addItem(address);//添加到升级成功列表
             ui->label_33->setText(QString::number(ui->listWidget->count()));
             m_successcount++;
             agent->increaseSuccessCount();
+            QFile file("success_mac.txt");
+            if (file.open(QIODevice::ReadWrite|QIODevice::Append))
+            {
+                QTextStream out(&file);
+                out << address << '\n';
+                file.close();
+            }
         } else {
 //            int failCount = ui->label_47->text().toInt();
 //            qDebug() << "failCount:" << failCount;
@@ -294,7 +305,7 @@ void MainWindow::onScanFinished()
     }
     if (m_successcount >= m_targetcount || !agent->isActive()) {//全部升级完成
         m_timer->stop();
-        agent->stopScan();
+        stopAgentScan();
         ui->tabWidget->setCurrentIndex(5);
         ui->label_46->setText(QString::number(ui->listWidget->count()));//已完成数
         ui->label_49->setText(ui->label_34->text());//总耗时
@@ -341,12 +352,27 @@ void MainWindow::on_pushButton_4_clicked()
     ui->tabWidget->setCurrentIndex(4);
     m_timer->start(1000);
     ui->pushButton_4->setEnabled(false);
-    agent->startScanDevice(60 * 1000, m_address_list);
+    startAgentScan();
 #else
     device->startDeviceDiscovery();
 #endif
 }
 
+void MainWindow::startAgentScan()
+{
+    if (agent && !agent->isActive())
+    {
+        agent->startScanDevice(60 * 1000, m_address_list);
+    }
+}
+
+void MainWindow::stopAgentScan()
+{
+    if (agent)
+    {
+        agent->stopScan();
+    }
+}
 
 void MainWindow::on_pushButton_3_clicked()
 {
@@ -362,7 +388,7 @@ void MainWindow::on_pushButton_6_clicked()
     ui->tableWidget_2->setRowCount(0);
     ui->listWidget->clear();
     m_timer->stop();
-    agent->stopScan();
+    stopAgentScan();
 //    for (auto &cont : controller_list) {
 //        delete cont;
 //        cont = nullptr;

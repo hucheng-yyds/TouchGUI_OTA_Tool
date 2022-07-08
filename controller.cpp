@@ -39,6 +39,13 @@ void Controller::ConnectDevice(const QBluetoothDeviceInfo &info)
 {
     if(m_controller)
     {
+        auto state = m_controller->state();
+        if (QLowEnergyController::ConnectingState == state
+                || QLowEnergyController::ConnectedState == state)
+        {
+            SendMessage("igoring repeat connect");
+            return;
+        }
         SendMessage(QString::number(m_timeout_count) + "disconnectFromDevice");
         m_controller->disconnectFromDevice();
         SendMessage("delete m_controller");
@@ -53,7 +60,6 @@ void Controller::ConnectDevice(const QBluetoothDeviceInfo &info)
     connect(m_controller, SIGNAL(disconnected()), this, SLOT(onDisconnected()));
     connect(m_controller, SIGNAL(stateChanged(QLowEnergyController::ControllerState)), this, SLOT(onStateChanged(QLowEnergyController::ControllerState)));
     connect(m_controller, SIGNAL(error(QLowEnergyController::Error)), this, SLOT(onError(QLowEnergyController::Error)));
-
     connect(m_controller, SIGNAL(serviceDiscovered(QBluetoothUuid)), this, SLOT(onServiceDiscovered(QBluetoothUuid)));
     connect(m_controller, SIGNAL(discoveryFinished()), this, SLOT(onDiscoveryFinished()));
     connect(m_controller, SIGNAL(connectionUpdated(QLowEnergyConnectionParameters)), this, SLOT(onConnectionUpdated(QLowEnergyConnectionParameters)));
@@ -63,27 +69,29 @@ void Controller::ConnectDevice(const QBluetoothDeviceInfo &info)
 
     if (!WaitServiceStartOTAReply(30))
     {
-        qWarning() << "Controller:" << m_controller->remoteAddress().toString()
+        qWarning() << "Controller:" << info.address().toString()
                  << QThread::currentThreadId() << "service start timout";
         deviceError();
     }
     else
     {
         SendMessage("service begin to ota");
+        m_startOTA = true;
     }
 }
 
 void Controller::DisconnectDevice()
 {
-    if(m_controller && QLowEnergyController::ConnectedState == m_controller->state())
-    {
-        m_controller->disconnectFromDevice();
-    }
+    deviceError();
+//    if (m_controller)
+//    {
+//        m_controller->disconnectFromDevice();
+//    }
 }
 
 QLowEnergyService * Controller::CreateService(QBluetoothUuid serviceUUID)
 {
-    if(m_controller)
+    if (m_controller)
     {
         return m_controller->createServiceObject(serviceUUID);
     }
@@ -97,7 +105,6 @@ void Controller::SendMessage(const QString &str)
 {
     if (m_controller) {
         qInfo() << "Controller:" << m_controller->remoteAddress().toString()
-                 //<< QTime::currentTime().toString("hh:mm:ss:zzz")
                  << QThread::currentThreadId() << str;
         emit message(str);
     }
@@ -105,7 +112,7 @@ void Controller::SendMessage(const QString &str)
 
 void Controller::onConnected()
 {
-    if(m_controller)
+    if (m_controller)
     {
         m_controller->discoverServices();
 
@@ -115,20 +122,22 @@ void Controller::onConnected()
 
 void Controller::deviceError()
 {
-    emit upgradeResult(false, m_controller->remoteAddress().toString());
+    if (m_controller)
+    {
+        emit upgradeResult(false, m_controller->remoteAddress().toString());
+    }
 }
 
 void Controller::onDisconnected()
 {
-    SendMessage("device disconnected");
-    if (m_timeout_count --) {
-        SendMessage("onReconnectDevice");
-        ConnectDevice(m_device_info);
-    } else {
-        qWarning() << "Controller:" << m_controller->remoteAddress().toString()
-                 << QThread::currentThreadId() << "try to reconnect device failed...";
-        deviceError();
-    }
+//    SendMessage("device disconnected");
+//    if (m_timeout_count --) {
+//        SendMessage(QString("onReconnectDevice timeout_count: %1").arg(m_timeout_count));
+//        ConnectDevice(m_device_info);
+//    } else {
+//        SendMessage("try to reconnect device failed...");
+//        deviceError();
+//    }
 }
 
 void Controller::onStateChanged(QLowEnergyController::ControllerState state)
@@ -160,7 +169,10 @@ void Controller::onError(QLowEnergyController::Error newError)
 
         qWarning() << "Controller:" << m_controller->remoteAddress().toString()
                  << QThread::currentThreadId() << str;
-        DisconnectDevice();
+        if (m_startOTA)
+        {
+            DisconnectDevice();
+        }
     }
 }
 
@@ -169,7 +181,7 @@ void Controller::onServiceDiscovered(QBluetoothUuid serviceUUID)
     if (0x27f0 == serviceUUID.data1
             || 0x0af0 == serviceUUID.data1) {
         QLowEnergyService *service= CreateService(serviceUUID);
-        if(m_controller) {
+        if (m_controller) {
             emit serviceDiscovered(service, m_controller->remoteAddress().toString());
         }
     }
@@ -177,6 +189,10 @@ void Controller::onServiceDiscovered(QBluetoothUuid serviceUUID)
 
 bool Controller::WaitServiceStartOTAReply(int secTimeout)
 {
+    if (m_service == nullptr)
+    {
+        return false;
+    }
     bool reply_succ = true;
 
     QEventLoop eventloop;

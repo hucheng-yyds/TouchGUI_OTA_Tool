@@ -25,7 +25,7 @@ void Agent::startScanDevice(uint32_t timeOut, const QStringList &address)
         m_address_list = address;
         m_agent->setLowEnergyDiscoveryTimeout(timeOut);
         m_agent->start(QBluetoothDeviceDiscoveryAgent::LowEnergyMethod);
-        SendMessage("scanning...");
+        SendMessage("startScan...");
         m_timer->start(10 * 1000 + timeOut);
 //        int i = 0;
 //        for (const auto &string : address) {
@@ -46,6 +46,7 @@ void Agent::stopScan()
 {
     m_agent->stop();
     m_timer->stop();
+    SendMessage("stopScan...");
 }
 
 bool Agent::isActive()

@@ -45,6 +45,8 @@ private:
     QBluetoothDeviceInfo m_device_info;
     Service *m_service = nullptr;
     int m_timeout_count = 3;
+
+    bool m_startOTA = false;
 };
 
 #endif // CONTROLLER_H

@@ -70,6 +70,7 @@ signals:
     void disconnectDevice();
     void upgradeResult(bool success, const QString &address);
     void startOTA(const QString &address);
+    void recvOTABodyReply();
 
 private:
     void SendCmdKeyData(const uchar cmd, const uchar key);

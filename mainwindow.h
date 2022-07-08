@@ -48,6 +48,10 @@ signals:
     void ConnectDevice(const QBluetoothDeviceInfo &info);
 
 private:
+    void startAgentScan();
+    void stopAgentScan();
+
+private:
     Ui::MainWindow *ui;
     Agent *agent;
 //    Controller *controller;

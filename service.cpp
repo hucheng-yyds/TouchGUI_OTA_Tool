@@ -232,9 +232,10 @@ void Service::onCharacteristicChanged(const QLowEnergyCharacteristic &info, cons
             }
             if (m_check_sum == m_cur_sum) {//校验客户端与设备的checksum
                 m_package_num = 0;
+                emit recvOTABodyReply();
             } else {
                 qCritical() << m_address << "check sum fail";
-                emit disconnectDevice();
+                emit upgradeResult(false, m_address);
             }
             break;
         case OTA_SEND_END:
@@ -243,8 +244,8 @@ void Service::onCharacteristicChanged(const QLowEnergyCharacteristic &info, cons
                 m_file_index ++;
                 if (m_file_index >= m_file_data_list.size()) {
                     m_ota_finished = true;
-                    SendCmdKeyData(CMD_HEAD_SYSTEM, SYSTEM_POWER_OFF);
-//                    SendCmdKeyData(CMD_HEAD_SYSTEM, SYSTEM_REBOOT);
+//                    SendCmdKeyData(CMD_HEAD_SYSTEM, SYSTEM_POWER_OFF);
+                    SendCmdKeyData(CMD_HEAD_SYSTEM, SYSTEM_REBOOT);
                     emit upgradeResult(true, m_address);
                     break;
                 }
@@ -277,8 +278,8 @@ void Service::onCharacteristicChanged(const QLowEnergyCharacteristic &info, cons
                 SendCmdKeyData(CMD_HEAD_PARAM, PARAM_GET_VER);
             } else {
                 qWarning() << m_address
-                           << "battery:" << value[7]
-                           << "has_detail_version:" << value[10];
+                           << "battery:" << int(value[7])
+                           << "has_detail_version:" << int(value[10]);
                 emit upgradeResult(false, m_address);
             }
             break;
@@ -516,7 +517,7 @@ bool Service::WaitReplyData2(int secTimeout)
     bool reply_succ = true;
 
     QEventLoop eventloop;
-    connect(m_service, &QLowEnergyService::characteristicChanged, &eventloop, &QEventLoop::quit);
+    connect(this, &Service::recvOTABodyReply, &eventloop, &QEventLoop::quit);
 
     QTimer timer;
     timer.setSingleShot(true);

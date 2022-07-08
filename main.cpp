@@ -115,16 +115,20 @@ void setLogLevel()
     qDebug() << "setLogLevel: " << g_LogLevel;
 }
 
-void clearLogFile()
+void clearFiles()
 {
     QFile logfile("ota.log");
     logfile.open(QIODevice::ReadWrite | QIODevice::Truncate);
     logfile.close();
+
+    QFile mfile("success_mac.txt");
+    mfile.open(QIODevice::ReadWrite | QIODevice::Truncate);
+    mfile.close();
 }
 
 int main(int argc, char *argv[])
 {
-    clearLogFile();
+    clearFiles();
     qInstallMessageHandler(myMessageOutput);
     setLogLevel();
 
