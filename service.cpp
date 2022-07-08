@@ -49,7 +49,7 @@ void Service::ConnectService(QLowEnergyService * service, const QString &address
 
 void Service::SendMessage(const QString &msg)
 {
-    qDebug() << m_address << msg;
+    qInfo() << m_address << msg;
     emit message(msg);
 }
 
@@ -94,8 +94,8 @@ void Service::ReadCharacteristic(QLowEnergyCharacteristic ch)
 
 void Service::WriteCharacteristic(QLowEnergyCharacteristic ch, const QByteArray &arr)
 {
-//    qDebug() << m_address << QTime::currentTime().toString("hh:mm:ss:zzz")
-//             << "Write Characteristic: " << arr.left(10).toHex('|');
+    qDebug() << m_address
+             << "Write Characteristic: " << arr.left(10).toHex('|');
     if(m_service)
     {
         if(ch.isValid())
@@ -189,8 +189,7 @@ void Service::onStateChanged(QLowEnergyService::ServiceState newState)
 void Service::onCharacteristicChanged(const QLowEnergyCharacteristic &info, const QByteArray &value)
 {
     Q_UNUSED(info);
-    QString ch = " - Characteristic Changed:" + value.toHex('|');
-    SendMessage(ch);
+    qDebug() << m_address << " - Characteristic Changed:" << value.toHex('|');
     if ((uchar)value[0] == CMD_HEAD_OTA) {
         switch (value[1]) {
         case OTA_SEND_START:
@@ -205,7 +204,7 @@ void Service::onCharacteristicChanged(const QLowEnergyCharacteristic &info, cons
                     emit upgradeResult(true, m_address);
                 }
             } else {
-                SendMessage("fail: OTA_SEND_START");
+                qWarning() << m_address << "fail: OTA_SEND_START";
                 emit disconnectDevice();
             }
             break;
@@ -219,7 +218,7 @@ void Service::onCharacteristicChanged(const QLowEnergyCharacteristic &info, cons
                     | ((value[9] & 0xFF) << 16)
                     | ((value[10] & 0xFF) << 24);
             qDebug() << m_address
-                     //<< QTime::currentTime().toString("hh:mm:ss:zzz")
+                     << "m_file_index:" << m_file_index
                      << "m_file_name:" << m_file_name_list[m_file_index]
                      << "m_file_size:" << m_file_data_list[m_file_index].size()
                      << "m_cur_sum:" << m_cur_sum
@@ -228,14 +227,13 @@ void Service::onCharacteristicChanged(const QLowEnergyCharacteristic &info, cons
                      << "m_file_offset:" << m_file_offset;
             if (CODE_SKIP_HEAD == value[2]) {
                 m_set_offset = true;
-                //sinal
                 SendMessage("CODE_SKIP_HEAD");
                 SendCmdKeyData(CMD_HEAD_OTA, OTA_SET_OFFSET);
             }
             if (m_check_sum == m_cur_sum) {//校验客户端与设备的checksum
                 m_package_num = 0;
             } else {
-                SendMessage("check sum fail");
+                qCritical() << m_address << "check sum fail";
                 emit disconnectDevice();
             }
             break;
@@ -252,7 +250,7 @@ void Service::onCharacteristicChanged(const QLowEnergyCharacteristic &info, cons
                 }
                 SendCmdKeyData(CMD_HEAD_OTA, OTA_SEND_START);
             } else {
-                SendMessage("fail: OTA_SEND_END");
+                qWarning() << m_address << "fail: OTA_SEND_END";
                 emit disconnectDevice();
             }
             break;
@@ -278,7 +276,9 @@ void Service::onCharacteristicChanged(const QLowEnergyCharacteristic &info, cons
 //                SendCmdKeyData(CMD_HEAD_PARAM, PARAM_GET_MTU);
                 SendCmdKeyData(CMD_HEAD_PARAM, PARAM_GET_VER);
             } else {
-                SendMessage("fail: battery low or no has_detail_version");
+                qWarning() << m_address
+                           << "battery:" << value[7]
+                           << "has_detail_version:" << value[10];
                 emit upgradeResult(false, m_address);
             }
             break;
@@ -287,8 +287,7 @@ void Service::onCharacteristicChanged(const QLowEnergyCharacteristic &info, cons
             {
                 if (CompareVersion(m_version, value.mid(8, 12)) <= 0)
                 {
-                    qDebug() << m_address
-                             //<< QTime::currentTime().toString("hh:mm:ss:zzz")
+                    qWarning() << m_address
                              << "device ignore, target version:" << m_version
                              << "device version:" << value.mid(8, 12);
                     emit upgradeResult(false, m_address);
@@ -351,7 +350,7 @@ void Service::onError(QLowEnergyService::ServiceError error)
         str = QString("service Error(%1):").arg(error);
         str += ServiceError[error];
 
-        SendMessage(str);
+        qWarning() << m_address << str;
         emit disconnectDevice();
     }
 }
@@ -432,9 +431,8 @@ void Service::StartSendData()
         if (m_package_num >= m_device_prn) {
             if (!WaitReplyData2(5))
             {
-                qDebug() << i << m_address
-                         //<< QTime::currentTime().toString("hh:mm:ss:zzz")
-                         << "recv d1 02 time out";
+                qCritical() << m_address
+                            << "recv d1 02 time out";
                 emit disconnectDevice();
                 break ;
             }
@@ -442,9 +440,8 @@ void Service::StartSendData()
             if (m_set_offset) {
                 if (!WaitReplyData2(5))
                 {
-                    qDebug() << i << m_address
-                             //<< QTime::currentTime().toString("hh:mm:ss:zzz")
-                             << "recv d1 04 time out";
+                    qCritical() << m_address
+                                << "recv d1 04 time out";
                     emit disconnectDevice();
                     break ;
                 }

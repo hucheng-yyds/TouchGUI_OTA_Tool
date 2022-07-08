@@ -48,9 +48,10 @@ void myMessageOutput(QtMsgType type, const QMessageLogContext &context, const QS
 
     QByteArray localMsg = msg.toLocal8Bit();
     //win console printer
-    fprintf(fp, "%s%s %s\n",
+    fprintf(fp, "%s%s %d %d %s\n",
             strLevel.toStdString().c_str(),
-            strDate.toStdString().c_str(), localMsg.constData());
+            strDate.toStdString().c_str(), type, g_LogLevel, localMsg.constData());
+    fflush(fp);
 
     //write msg to log file
     static QMutex m;
@@ -59,7 +60,7 @@ void myMessageOutput(QtMsgType type, const QMessageLogContext &context, const QS
     bool ret = logfile.open(QIODevice::ReadWrite | QIODevice::Append);
     if (ret){
         QTextStream out(&logfile);
-        out.setCodec(QTextCodec::codecForName("utf-8"));
+        out.setCodec(QTextCodec::codecForName("UTF-8"));
         out << strLevel << strDate << " "
             << localMsg.constData()
             << "\n";
@@ -77,16 +78,16 @@ QtMsgType convertLogLevel(int level)
         ret = QtDebugMsg;
         break;
     case 1:
-        ret = QtInfoMsg;
-        break;
-    case 2:
         ret = QtWarningMsg;
         break;
-    case 3:
+    case 2:
         ret = QtCriticalMsg;
         break;
-    case 4:
+    case 3:
         ret = QtFatalMsg;
+        break;
+    case 4:
+        ret = QtInfoMsg;
         break;
     default:
         break;
@@ -114,8 +115,16 @@ void setLogLevel()
     qDebug() << "setLogLevel: " << g_LogLevel;
 }
 
+void clearLogFile()
+{
+    QFile logfile("ota.log");
+    logfile.open(QIODevice::ReadWrite | QIODevice::Truncate);
+    logfile.close();
+}
+
 int main(int argc, char *argv[])
 {
+    clearLogFile();
     qInstallMessageHandler(myMessageOutput);
     setLogLevel();
 

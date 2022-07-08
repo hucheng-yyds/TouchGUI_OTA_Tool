@@ -60,7 +60,7 @@ void Agent::setMatchStr(const QString &matchStr)
 
 void Agent::SendMessage(const QString &msg)
 {
-    qDebug() << "Agent" << msg;
+    qInfo() << "Agent" << msg;
     emit message(msg);
 }
 
@@ -92,7 +92,7 @@ void Agent::onError(QBluetoothDeviceDiscoveryAgent::Error err)
     str = QString("Error(%1):").arg(err);
     str += m_agent->errorString();
 
-    SendMessage(str);
+    qWarning() << "Agent" << str;
 }
 
 void Agent::onFinished()

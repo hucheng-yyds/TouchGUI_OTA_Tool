@@ -80,10 +80,14 @@ MainWindow::MainWindow(QWidget *parent)
             } else if (!string.indexOf("queue:")){
                 string.remove(0, 6);
                 m_queuemax = string.toInt();
-            }else {
+            } else if (!string.indexOf("loglevel:"))
+            {
+                //main setLogLevel
+            }
+            else {
                 m_address_list.append(string);
             }
-            qDebug() << string;
+            qInfo() << string;
         }
         m_address_list.removeDuplicates();
         file.close();
@@ -123,7 +127,7 @@ void MainWindow::GetDirectoryFile(const QString &dirName)
     m_file_data_list.clear();
     foreach(QString name, files) {
         QFile file(dir.absoluteFilePath(name));
-        qDebug() << "file name:" << file.fileName();
+        qInfo() << "file name:" << file.fileName();
         m_total_file_size += file.size();
         if (file.open(QIODevice::ReadOnly)) {
             m_file_name_list.append(name.toUtf8());
@@ -219,16 +223,16 @@ void MainWindow::onDeviceDiscovered(const QBluetoothDeviceInfo &info)
 {
     if (!ui->tableWidget_2->findItems(info.address().toString()
                                       , Qt::MatchFixedString).empty()) {
-        qDebug() << info.address().toString() << "is already connecting";
+        qInfo() << info.address().toString() << "is already connecting";
         return ;
     }
     if (!ui->listWidget->findItems(info.address().toString()
                                       , Qt::MatchFixedString).empty()) {
-        qDebug() << info.address().toString() << "has already finished";
+        qInfo() << info.address().toString() << "has already finished";
         return ;
     }
     if (controller_list.size() >= m_queuemax) {
-        qDebug() << info.address().toString() << "can not connect"
+        qInfo() << info.address().toString() << "can not connect"
                  << "wait for idle, controller queue:" << controller_list.size();
         return ;
     }
@@ -253,11 +257,11 @@ void MainWindow::onUpgradeResult(bool success, const QString &address)
     if (!list.isEmpty()) {//单个升级完成
         int index = ui->tableWidget_2->row(list[0]);
         if (-1 == index) {
-            qDebug() << "dont find device";
+            qWarning() << "dont find device";
             index = 0;
         }
         ui->tableWidget_2->removeRow(index);//从正在升级列表移除
-        qDebug() << address << "upgrade result:" << success;
+        qInfo() << address << "upgrade result:" << success;
         delete controller_list[index];
         controller_list.removeAt(index);
         if (success) {
@@ -296,7 +300,7 @@ void MainWindow::onScanFinished()
         ui->label_49->setText(ui->label_34->text());//总耗时
         ui->label_47->setText(QString::number(m_targetcount-m_successcount));//未完成数
         double hourCount = ui->listWidget->count() / (m_elapsed_second / 3600.00);
-        qDebug() << "hourCount:" << hourCount << m_elapsed_second << ui->listWidget->count();
+        qInfo() << "hourCount:" << hourCount << m_elapsed_second << ui->listWidget->count();
         ui->label_48->setText(QString::number(hourCount, 'f', 0)+" units/hour");//平均速度
         ui->pushButton_4->setEnabled(true);
     }
@@ -324,7 +328,7 @@ void MainWindow::on_pushButton_4_clicked()
     {
         m_targetcount = m_address_list.size();
     }
-    qDebug() << "Target count:" << m_targetcount;
+    qInfo() << "Target count:" << m_targetcount;
     if (m_targetcount < 1)
     {
         QMessageBox::information(this, "提示", "请确认目标数", QMessageBox::NoButton);
@@ -426,7 +430,7 @@ void MainWindow::on_pushButton_2_clicked()
         qDebug() << "custOtaId:" << custOtaId << "version:" << version;
         QString dirname;
         if (https->downloadPackage(custOtaId, dirname) < 0) {
-            qDebug() << "download fail";
+            qWarning() << "download fail";
             return ;
         }
         GetDirectoryFile(dirname);
