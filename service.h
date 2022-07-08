@@ -54,14 +54,14 @@ private slots:
     void onStateChanged(QLowEnergyService::ServiceState newState);
     void onCharacteristicChanged(const QLowEnergyCharacteristic &info,
                                  const QByteArray &value);
-    void onCharacteristicRead(const QLowEnergyCharacteristic &info,
-                              const QByteArray &value);
-    void onCharacteristicWritten(const QLowEnergyCharacteristic &info,
-                                 const QByteArray &value);
-    void onDescriptorRead(const QLowEnergyDescriptor &info,
-                          const QByteArray &value);
-    void onDescriptorWritten(const QLowEnergyDescriptor &info,
-                             const QByteArray &value);
+//    void onCharacteristicRead(const QLowEnergyCharacteristic &info,
+//                              const QByteArray &value);
+//    void onCharacteristicWritten(const QLowEnergyCharacteristic &info,
+//                                 const QByteArray &value);
+//    void onDescriptorRead(const QLowEnergyDescriptor &info,
+//                          const QByteArray &value);
+//    void onDescriptorWritten(const QLowEnergyDescriptor &info,
+//                             const QByteArray &value);
     void onError(QLowEnergyService::ServiceError error);
 
 signals:
@@ -69,6 +69,7 @@ signals:
     void discoveryCharacteristic(QLowEnergyCharacteristic);
     void disconnectDevice();
     void upgradeResult(bool success, const QString &address);
+    void startOTA(const QString &address);
 
 private:
     void SendCmdKeyData(const uchar cmd, const uchar key);
@@ -99,6 +100,7 @@ private:
     int m_package_num = 0;
     int m_check_sum = 0;
     int m_cur_sum = 0;
+    bool m_ota_finished = false;
 };
 
 #endif // SERVICE_H

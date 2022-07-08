@@ -81,6 +81,7 @@ int HttpsClient::upgradePackageList(QList<QStringList> &stringList)
             for (const auto &value : qAsConst(array)) {
                 QStringList list;
                 list << QString::number(value.toObject()["custOtaId"].toInt());
+                list << value.toObject()["custOtaPackageName"].toString();
                 list << value.toObject()["custOtaTargetVersion"].toString();
                 list << value.toObject()["custProductCenterName"].toString();
                 list << value.toObject()["createdTime"].toString();
@@ -94,7 +95,7 @@ int HttpsClient::upgradePackageList(QList<QStringList> &stringList)
     return -1;
 }
 
-int HttpsClient::downloadPackage(const int custOtaId)
+int HttpsClient::downloadPackage(const int custOtaId, QString &filename)
 {
     QByteArray data;
     const QString &url = "touchlink/customer/ota/tool/downloadOTA/" + QString::number(custOtaId);
@@ -109,9 +110,10 @@ int HttpsClient::downloadPackage(const int custOtaId)
     file.open(QIODevice::ReadWrite);
     file.write(data);
     file.close();
-    QByteArrayList dirname = m_filename.split('.');
-    system("mkdir " + dirname.value(0)); // del /f /s /q  ota\*
-    system("tar -xvf " + m_filename + " -C %cd%/" + dirname.value(0));
+    QByteArray dirname = m_filename.chopped(4);
+    system("mkdir " + dirname); // del /f /s /q  ota\*
+    system("tar -xvf " + m_filename + " -C %cd%/" + dirname);
+    filename = dirname;
     return 0;
 }
 

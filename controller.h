@@ -32,6 +32,8 @@ private slots:
     void onConnectionUpdated(const QLowEnergyConnectionParameters &parameters);
     void onReconnectDevice();
 
+    bool WaitServiceStartOTAReply(int secTimeout);
+    void deviceError();
 signals:
     void message(QString msg);;
     void serviceDiscovered(QLowEnergyService *service, const QString &address);

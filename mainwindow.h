@@ -29,6 +29,7 @@ public:
 
 protected:
     bool eventFilter(QObject *obj, QEvent *ev) override;
+    void keyPressEvent(QKeyEvent *keyValue) override;
 
 private slots:
     void onDeviceDiscovered(const QBluetoothDeviceInfo &info);
@@ -61,6 +62,7 @@ private:
     QTimer *m_timer;
     int m_elapsed_second = 0;
     QStringList m_address_list;
+    QString m_barStr;
 
     int m_targetcount = 0;
     int m_successcount = 0;

@@ -35,10 +35,10 @@ void Service::ConnectService(QLowEnergyService * service, const QString &address
             connect(m_service, &QLowEnergyService::characteristicChanged, m_eventloop, &QEventLoop::quit);
             connect(m_service, SIGNAL(stateChanged(QLowEnergyService::ServiceState)), this, SLOT(onStateChanged(QLowEnergyService::ServiceState)));
             connect(m_service, SIGNAL(characteristicChanged(QLowEnergyCharacteristic, QByteArray)), this, SLOT(onCharacteristicChanged(QLowEnergyCharacteristic, QByteArray)));
-            connect(m_service, SIGNAL(characteristicRead(QLowEnergyCharacteristic, QByteArray)), this, SLOT(onCharacteristicRead(QLowEnergyCharacteristic, QByteArray)));
-            connect(m_service, SIGNAL(characteristicWritten(QLowEnergyCharacteristic, QByteArray)), this, SLOT(onCharacteristicWritten(QLowEnergyCharacteristic, QByteArray)));
-            connect(m_service, SIGNAL(descriptorRead(QLowEnergyDescriptor, QByteArray)), this, SLOT(onDescriptorRead(QLowEnergyDescriptor, QByteArray)));
-            connect(m_service, SIGNAL(descriptorWritten(QLowEnergyDescriptor, QByteArray)), this, SLOT(onDescriptorWritten(QLowEnergyDescriptor, QByteArray)));
+            //connect(m_service, SIGNAL(characteristicRead(QLowEnergyCharacteristic, QByteArray)), this, SLOT(onCharacteristicRead(QLowEnergyCharacteristic, QByteArray)));
+            //connect(m_service, SIGNAL(characteristicWritten(QLowEnergyCharacteristic, QByteArray)), this, SLOT(onCharacteristicWritten(QLowEnergyCharacteristic, QByteArray)));
+            //connect(m_service, SIGNAL(descriptorRead(QLowEnergyDescriptor, QByteArray)), this, SLOT(onDescriptorRead(QLowEnergyDescriptor, QByteArray)));
+            //connect(m_service, SIGNAL(descriptorWritten(QLowEnergyDescriptor, QByteArray)), this, SLOT(onDescriptorWritten(QLowEnergyDescriptor, QByteArray)));
             connect(m_service, SIGNAL(error(QLowEnergyService::ServiceError)), this, SLOT(onError(QLowEnergyService::ServiceError)));
             QThread::msleep(500);
             SendMessage("discoverDetails:" + QString::number(m_service->state()));
@@ -49,7 +49,7 @@ void Service::ConnectService(QLowEnergyService * service, const QString &address
 
 void Service::SendMessage(const QString &msg)
 {
-    qDebug() << m_address << QTime::currentTime().toString("hh:mm:ss:zzz") << msg;
+    qDebug() << m_address << msg;
     emit message(msg);
 }
 
@@ -135,6 +135,13 @@ void Service::onStateChanged(QLowEnergyService::ServiceState newState)
 {
     if(m_service)
     {
+        if (m_ota_finished)
+        {
+            SendMessage("OTA is already finished...");
+            emit upgradeResult(true, m_address);
+            return;
+        }
+
         switch(newState)
         {
         case QLowEnergyService::DiscoveringServices:
@@ -151,6 +158,8 @@ void Service::onStateChanged(QLowEnergyService::ServiceState newState)
 
         case QLowEnergyService::ServiceDiscovered:
         {
+            emit startOTA(m_address);
+
             SendMessage("Discovered services");
             QList<QLowEnergyCharacteristic> characteristics = m_service->characteristics();
 
@@ -180,7 +189,7 @@ void Service::onStateChanged(QLowEnergyService::ServiceState newState)
 void Service::onCharacteristicChanged(const QLowEnergyCharacteristic &info, const QByteArray &value)
 {
     Q_UNUSED(info);
-    QString ch = /*info.uuid().toString() + */" - Characteristic Changed:" + value.toHex('|');
+    QString ch = " - Characteristic Changed:" + value.toHex('|');
     SendMessage(ch);
     if ((uchar)value[0] == CMD_HEAD_OTA) {
         switch (value[1]) {
@@ -210,7 +219,7 @@ void Service::onCharacteristicChanged(const QLowEnergyCharacteristic &info, cons
                     | ((value[9] & 0xFF) << 16)
                     | ((value[10] & 0xFF) << 24);
             qDebug() << m_address
-                     << QTime::currentTime().toString("hh:mm:ss:zzz")
+                     //<< QTime::currentTime().toString("hh:mm:ss:zzz")
                      << "m_file_name:" << m_file_name_list[m_file_index]
                      << "m_file_size:" << m_file_data_list[m_file_index].size()
                      << "m_cur_sum:" << m_cur_sum
@@ -235,6 +244,7 @@ void Service::onCharacteristicChanged(const QLowEnergyCharacteristic &info, cons
                 StopSendData();
                 m_file_index ++;
                 if (m_file_index >= m_file_data_list.size()) {
+                    m_ota_finished = true;
                     SendCmdKeyData(CMD_HEAD_SYSTEM, SYSTEM_POWER_OFF);
 //                    SendCmdKeyData(CMD_HEAD_SYSTEM, SYSTEM_REBOOT);
                     emit upgradeResult(true, m_address);
@@ -273,13 +283,19 @@ void Service::onCharacteristicChanged(const QLowEnergyCharacteristic &info, cons
             }
             break;
         case PARAM_GET_VER:
-            if (CompareVersion(m_version, value.mid(8, 12)) > 0
-                    || m_version.isEmpty()) {
-                SendCmdKeyData(CMD_HEAD_OTA, OTA_SET_PROGRESS);
-            } else {
-                SendMessage("fail: version small");
-                emit upgradeResult(false, m_address);
+            if (!m_version.isEmpty())
+            {
+                if (CompareVersion(m_version, value.mid(8, 12)) <= 0)
+                {
+                    qDebug() << m_address
+                             //<< QTime::currentTime().toString("hh:mm:ss:zzz")
+                             << "device ignore, target version:" << m_version
+                             << "device version:" << value.mid(8, 12);
+                    emit upgradeResult(false, m_address);
+                    return;
+                }
             }
+            SendCmdKeyData(CMD_HEAD_OTA, OTA_SET_PROGRESS);
             break;
         case PARAM_GET_MTU:
             m_device_mtu &= (value[2] << 8) + value[3];
@@ -291,29 +307,29 @@ void Service::onCharacteristicChanged(const QLowEnergyCharacteristic &info, cons
     }
 }
 
-void Service::onCharacteristicRead(const QLowEnergyCharacteristic &info, const QByteArray &value)
-{
-    QString ch = info.uuid().toString() + " - Characteristic read:" + QString(value);
-    SendMessage(ch);
-}
-
-void Service::onCharacteristicWritten(const QLowEnergyCharacteristic &info, const QByteArray &value)
-{
-    QString ch = info.uuid().toString() + " - Characteristic written:" + value.left(10).toHex('|');
+//void Service::onCharacteristicRead(const QLowEnergyCharacteristic &info, const QByteArray &value)
+//{
+//    QString ch = info.uuid().toString() + " - Characteristic read:" + QString(value);
 //    SendMessage(ch);
-}
+//}
 
-void Service::onDescriptorRead(const QLowEnergyDescriptor &info, const QByteArray &value)
-{
-    QString ch = info.uuid().toString() + " - descriptor read:" + QString(value);
-    SendMessage(ch);
-}
+//void Service::onCharacteristicWritten(const QLowEnergyCharacteristic &info, const QByteArray &value)
+//{
+//    QString ch = info.uuid().toString() + " - Characteristic written:" + value.left(10).toHex('|');
+//    SendMessage(ch);
+//}
 
-void Service::onDescriptorWritten(const QLowEnergyDescriptor &info, const QByteArray &value)
-{
-    QString ch = info.uuid().toString() + " - descriptor written:" + QString(value);
-    SendMessage(ch);
-}
+//void Service::onDescriptorRead(const QLowEnergyDescriptor &info, const QByteArray &value)
+//{
+//    QString ch = info.uuid().toString() + " - descriptor read:" + QString(value);
+//    SendMessage(ch);
+//}
+
+//void Service::onDescriptorWritten(const QLowEnergyDescriptor &info, const QByteArray &value)
+//{
+//    QString ch = info.uuid().toString() + " - descriptor written:" + QString(value);
+//    SendMessage(ch);
+//}
 
 void Service::onError(QLowEnergyService::ServiceError error)
 {
@@ -393,7 +409,6 @@ void Service::SendCmdKeyData(const uchar cmd, const uchar key)
         byte.append(0x02);
         byte.append((char)0x00);
     }
-    SendMessage("SendCmdKeyData " + byte.left(10).toHex('|'));
     WriteCharacteristic(m_characteristics, byte);
 }
 
@@ -418,7 +433,7 @@ void Service::StartSendData()
             if (!WaitReplyData2(5))
             {
                 qDebug() << i << m_address
-                         << QTime::currentTime().toString("hh:mm:ss:zzz")
+                         //<< QTime::currentTime().toString("hh:mm:ss:zzz")
                          << "recv d1 02 time out";
                 emit disconnectDevice();
                 break ;
@@ -428,8 +443,8 @@ void Service::StartSendData()
                 if (!WaitReplyData2(5))
                 {
                     qDebug() << i << m_address
-                             << QTime::currentTime().toString("hh:mm:ss:zzz")
-                             << "recv d1 02 time out";
+                             //<< QTime::currentTime().toString("hh:mm:ss:zzz")
+                             << "recv d1 04 time out";
                     emit disconnectDevice();
                     break ;
                 }
@@ -438,7 +453,6 @@ void Service::StartSendData()
             }
         }
         if (m_last_pack) {
-            SendMessage("m_last_pack true");
             SendCmdKeyData(CMD_HEAD_OTA, OTA_SEND_END);
             break ;
         }
@@ -447,7 +461,6 @@ void Service::StartSendData()
 
 void Service::StopSendData()
 {
-    SendMessage("StopSendData");
     m_last_pack = false;
     m_package_num = 0;
     m_file_offset = 0;

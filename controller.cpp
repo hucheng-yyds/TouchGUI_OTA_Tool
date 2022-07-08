@@ -1,4 +1,6 @@
 #include "controller.h"
+#include <QTime>
+#include <QTimer>
 
 Controller::Controller(QObject *parent) : QObject(parent)
 {
@@ -58,6 +60,16 @@ void Controller::ConnectDevice(const QBluetoothDeviceInfo &info)
 
     m_controller->connectToDevice();
     SendMessage("ConnectDevice");
+
+    if (!WaitServiceStartOTAReply(30))
+    {
+        SendMessage("service start timout");
+        deviceError();
+    }
+    else
+    {
+        SendMessage("service begin to ota");
+    }
 }
 
 void Controller::DisconnectDevice()
@@ -84,6 +96,7 @@ void Controller::SendMessage(const QString &str)
 {
     if (m_controller) {
         qDebug() << "Controller:" << m_controller->remoteAddress().toString()
+                 //<< QTime::currentTime().toString("hh:mm:ss:zzz")
                  << QThread::currentThreadId() << str;
         emit message(str);
     }
@@ -99,6 +112,11 @@ void Controller::onConnected()
     }
 }
 
+void Controller::deviceError()
+{
+    emit upgradeResult(false, m_controller->remoteAddress().toString());
+}
+
 void Controller::onDisconnected()
 {
     SendMessage("device disconnected");
@@ -106,7 +124,8 @@ void Controller::onDisconnected()
         SendMessage("onReconnectDevice");
         ConnectDevice(m_device_info);
     } else {
-        emit upgradeResult(false, m_controller->remoteAddress().toString());
+        SendMessage("try to reconnect device failed...");
+        deviceError();
     }
 }
 
@@ -151,6 +170,23 @@ void Controller::onServiceDiscovered(QBluetoothUuid serviceUUID)
             emit serviceDiscovered(service, m_controller->remoteAddress().toString());
         }
     }
+}
+
+bool Controller::WaitServiceStartOTAReply(int secTimeout)
+{
+    bool reply_succ = true;
+
+    QEventLoop eventloop;
+    connect(m_service, &Service::startOTA, &eventloop, &QEventLoop::quit);
+
+    QTimer timer;
+    timer.setSingleShot(true);
+    connect(&timer, &QTimer::timeout, [&eventloop,&reply_succ]{reply_succ=false; eventloop.quit();});
+    timer.start(secTimeout * 1000);
+
+    eventloop.exec();
+    timer.stop();
+    return reply_succ;
 }
 
 void Controller::onDiscoveryFinished()

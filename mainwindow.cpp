@@ -9,6 +9,7 @@
 #include <QDir>
 #include <QFileDialog>
 #include <QMessageBox>
+#include <QKeyEvent>
 
 //#define SAMPLE
 MainWindow::MainWindow(QWidget *parent)
@@ -84,15 +85,19 @@ MainWindow::MainWindow(QWidget *parent)
             }
             qDebug() << string;
         }
+        m_address_list.removeDuplicates();
         file.close();
     }
-//    if (ui->label_19->text().isEmpty()) {//如果配置文件没有指定路径，那么默认当前目录 oy28_ota_file
-//        ui->label_19->setText("oy28_ota_file");
-//    }
     GetDirectoryFile(ui->label_19->text());
 #else
     device = new Device;
 #endif
+
+    //init vcode
+    if (https->verificationCode() == 0)
+    {
+        ui->label_52->setPixmap(QPixmap(QString::fromUtf8("a.jpg")));
+    }
 }
 
 MainWindow::~MainWindow()
@@ -162,6 +167,54 @@ bool MainWindow::eventFilter(QObject *obj, QEvent *ev)
     }
 }
 
+void MainWindow::keyPressEvent(QKeyEvent *keyValue)
+{
+    if (keyValue->key() == Qt::Key_Return) //enter
+    {
+        if (ui->lineEdit_4->text().isEmpty()) {
+            ui->lineEdit_4->setText(m_barStr);
+        } else {
+            m_barStr = ui->lineEdit_4->text();
+        }
+        QStringList strlist = m_barStr.split("MAC:");
+//        qDebug() << "QrCode:" << strlist;
+        QFile file("mac.txt");
+        file.open(QIODevice::WriteOnly);
+        QTextStream out(&file);
+        for (int i = 1; i < strlist.size(); i ++) {
+            bool ok = false;
+            //there are two mac address formats
+            //abcdef123456, ab:cd:ef:12:34:56
+            QString macStr = strlist.at(i).left(12);
+            if (macStr.indexOf(":") > 0)
+            {
+                macStr = strlist.at(i).left(17);
+            }
+            else
+            {
+                quint64 macNum = macStr.toULongLong(&ok, 16);
+                QBluetoothAddress mac(macNum);
+                macStr = mac.toString();
+            }
+            if (macStr.size() != 17)
+            {
+                continue;
+            }
+            qDebug() << macStr;
+            out << macStr << '\n';
+            m_address_list << macStr;
+        }
+        m_address_list.removeDuplicates();
+        m_targetcount = m_address_list.size();
+        ui->lineEdit_4->setText(QString::number(m_targetcount));
+        file.close();
+        m_barStr.clear();
+    }
+    else {
+        m_barStr += keyValue->text();
+    }
+}
+
 void MainWindow::onDeviceDiscovered(const QBluetoothDeviceInfo &info)
 {
     if (!ui->tableWidget_2->findItems(info.address().toString()
@@ -204,7 +257,7 @@ void MainWindow::onUpgradeResult(bool success, const QString &address)
             index = 0;
         }
         ui->tableWidget_2->removeRow(index);//从正在升级列表移除
-        qDebug() << address << "list size:" << list.size() << index;
+        qDebug() << address << "upgrade result:" << success;
         delete controller_list[index];
         controller_list.removeAt(index);
         if (success) {
@@ -263,12 +316,20 @@ void MainWindow::on_pushButton_4_clicked()
             return ;
         }
     }
-    m_targetcount = ui->lineEdit_4->text().toInt();
+    if (m_targetcount == 0)
+    {
+        m_targetcount = ui->lineEdit_4->text().toInt();
+    }
     if (m_targetcount < 1)
     {
         m_targetcount = m_address_list.size();
     }
     qDebug() << "Target count:" << m_targetcount;
+    if (m_targetcount < 1)
+    {
+        QMessageBox::information(this, "提示", "请确认目标数", QMessageBox::NoButton);
+        return ;
+    }
     agent->setTargetCount(m_targetcount);
     agent->setMatchStr(ui->lineEdit_5->text());
     ui->label_32->setText(QString::number(m_targetcount));
@@ -335,7 +396,7 @@ void MainWindow::on_pushButton_clicked()
     qDebug() << "stringList:" << stringList.size();
     ui->tabWidget->setCurrentIndex(1);
     for (auto &list : stringList) {
-        int column = 2;
+        int column = 1;
         int rowCount = ui->tableWidget->rowCount();
         ui->tableWidget->insertRow(rowCount);
         ui->tableWidget->setItem(rowCount, 0, new QTableWidgetItem(list.value(0)));
@@ -363,14 +424,18 @@ void MainWindow::on_pushButton_2_clicked()
         QString version = ui->tableWidget->item(currentRow, 2)->text();
 
         qDebug() << "custOtaId:" << custOtaId << "version:" << version;
-        if (https->downloadPackage(custOtaId) < 0) {
+        QString dirname;
+        if (https->downloadPackage(custOtaId, dirname) < 0) {
             qDebug() << "download fail";
             return ;
         }
+        GetDirectoryFile(dirname);
+        ui->label_19->setText(dirname);
         ui->label_20->setText(version);
         ui->label_31->setText(version);
         ui->label_38->setText(version);
         m_version = version.toUtf8();
+        m_version.resize(12);
     }
 }
 
