@@ -5,6 +5,7 @@
 #include <QLowEnergyService>
 #include <QEventLoop>
 #include <QThread>
+#include <QPointer>
 
 #define CMD_HEAD_PARAM      (uchar)0x02
 #define PARAM_GET_INFO      (uchar)0x01
@@ -36,9 +37,7 @@ class Service : public QObject
     Q_OBJECT
 public:
     explicit Service(QObject *parent = nullptr);
-    ~Service() {
-        SendMessage("~Service");
-    }
+    ~Service();
 
     void SetProperty(QByteArrayList &data, QByteArrayList &name, int size, QByteArray &version);
     void ConnectService(QLowEnergyService *, const QString &address);
@@ -77,14 +76,13 @@ private:
     void StartSendData();
     void StopSendData();
     bool WaitReplyData(int secTimeout);
-    bool WaitReplyData2(int secTimeout);
+    bool WaitOTABodyReply(int secTimeout);
     int CompareVersion(const QByteArray &version1, const QByteArray &version2);
 
-    QLowEnergyService * m_service;
+    //QLowEnergyService * m_service = nullptr;
+    QPointer<QLowEnergyService> m_service;
     QLowEnergyCharacteristic m_characteristics;
     QString m_address;
-    QEventLoop *m_eventloop;
-    QTimer *m_timer;
 
     QByteArrayList m_file_data_list;
     QByteArrayList m_file_name_list;

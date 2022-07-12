@@ -10,6 +10,7 @@
 #include <QFileDialog>
 #include <QMessageBox>
 #include <QKeyEvent>
+#include <QOperatingSystemVersion>
 
 //#define SAMPLE
 MainWindow::MainWindow(QWidget *parent)
@@ -102,12 +103,25 @@ MainWindow::MainWindow(QWidget *parent)
     {
         ui->label_52->setPixmap(QPixmap(QString::fromUtf8("a.jpg")));
     }
+
+    //get system version
+    auto cur_system = QOperatingSystemVersion::current();
+    if (cur_system > QOperatingSystemVersion::Windows10)
+    {
+        m_startTimeout = 60;
+    }
+
+    qInfo() << "current operating system version:" << cur_system;
+    qInfo() << "set controller start timeout:" << m_startTimeout << "secs";
 }
 
 MainWindow::~MainWindow()
 {
     on_pushButton_6_clicked();
     delete ui;
+    delete agent;
+    delete https;
+    delete m_timer;
 }
 
 void MainWindow::GetDirectoryFile(const QString &dirName)
@@ -247,7 +261,7 @@ void MainWindow::onDeviceDiscovered(const QBluetoothDeviceInfo &info)
     controller_list.append(controller);
     controller->SetProperty(m_file_data_list, m_file_name_list, m_total_file_size, m_version);
 //    controller->ConnectDevice(info);
-    emit ConnectDevice(info);
+    emit ConnectDevice(info, m_startTimeout);
     disconnect(this, &MainWindow::ConnectDevice, controller, &Controller::ConnectDevice);
     int rowCount = ui->tableWidget_2->rowCount();
     ui->tableWidget_2->insertRow(rowCount);//添加到正在升级列表
@@ -264,7 +278,8 @@ void MainWindow::onUpgradeResult(bool success, const QString &address)
             index = 0;
         }
         ui->tableWidget_2->removeRow(index);//从正在升级列表移除
-        qInfo() << address << "upgrade result:" << success;
+        qInfo() << address << "upgrade result:" << success
+                << "row index:" << index;
         delete controller_list[index];
         controller_list.removeAt(index);
         startAgentScan();
@@ -345,6 +360,9 @@ void MainWindow::on_pushButton_4_clicked()
         QMessageBox::information(this, "提示", "请确认目标数", QMessageBox::NoButton);
         return ;
     }
+    m_successcount = 0;
+    m_failcount = 0;
+
     agent->setTargetCount(m_targetcount);
     agent->setMatchStr(ui->lineEdit_5->text());
     ui->label_32->setText(QString::number(m_targetcount));

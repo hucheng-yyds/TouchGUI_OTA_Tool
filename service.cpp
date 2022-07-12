@@ -4,11 +4,12 @@
 #include <QCryptographicHash>
 
 Service::Service(QObject *parent) : QObject(parent)
-  , m_eventloop(new QEventLoop(this))
-  , m_timer(new QTimer(this))
 {
-    m_service = NULL;
-    m_timer->setSingleShot(true);
+}
+
+Service::~Service()
+{
+    SendMessage("~Service");
 }
 
 void Service::SetProperty(QByteArrayList &data, QByteArrayList &name, int size, QByteArray &version)
@@ -25,14 +26,16 @@ void Service::ConnectService(QLowEnergyService * service, const QString &address
     m_address = address;
     if(m_service)
     {
-        if(m_service->state() == QLowEnergyService::ServiceDiscovered)
+        auto state = m_service->state();
+        //SendMessage("Service::ConnectService state:" + QString::number(state));
+        qInfo() << m_address << QThread::currentThreadId()
+                << "Service::ConnectService state:" << state;
+        if(state == QLowEnergyService::ServiceDiscovered)
         {
             onStateChanged(QLowEnergyService::ServiceDiscovered);
         }
-        else if (m_service->state() == QLowEnergyService::DiscoveryRequired)
+        else if (state == QLowEnergyService::DiscoveryRequired)
         {
-            connect(m_timer, &QTimer::timeout, m_eventloop, &QEventLoop::quit);
-            connect(m_service, &QLowEnergyService::characteristicChanged, m_eventloop, &QEventLoop::quit);
             connect(m_service, SIGNAL(stateChanged(QLowEnergyService::ServiceState)), this, SLOT(onStateChanged(QLowEnergyService::ServiceState)));
             connect(m_service, SIGNAL(characteristicChanged(QLowEnergyCharacteristic, QByteArray)), this, SLOT(onCharacteristicChanged(QLowEnergyCharacteristic, QByteArray)));
             //connect(m_service, SIGNAL(characteristicRead(QLowEnergyCharacteristic, QByteArray)), this, SLOT(onCharacteristicRead(QLowEnergyCharacteristic, QByteArray)));
@@ -41,15 +44,15 @@ void Service::ConnectService(QLowEnergyService * service, const QString &address
             //connect(m_service, SIGNAL(descriptorWritten(QLowEnergyDescriptor, QByteArray)), this, SLOT(onDescriptorWritten(QLowEnergyDescriptor, QByteArray)));
             connect(m_service, SIGNAL(error(QLowEnergyService::ServiceError)), this, SLOT(onError(QLowEnergyService::ServiceError)));
             QThread::msleep(500);
-            SendMessage("discoverDetails:" + QString::number(m_service->state()));
             m_service->discoverDetails();
+            SendMessage("discoverDetails");
         }
     }
 }
 
 void Service::SendMessage(const QString &msg)
 {
-    qInfo() << m_address << msg;
+    qInfo() << m_address << QThread::currentThreadId() << msg;
     emit message(msg);
 }
 
@@ -142,6 +145,8 @@ void Service::onStateChanged(QLowEnergyService::ServiceState newState)
             return;
         }
 
+        qInfo() << m_address << QThread::currentThreadId()
+                << "onStateChanged state:" << newState;
         switch(newState)
         {
         case QLowEnergyService::DiscoveringServices:
@@ -158,8 +163,6 @@ void Service::onStateChanged(QLowEnergyService::ServiceState newState)
 
         case QLowEnergyService::ServiceDiscovered:
         {
-            emit startOTA(m_address);
-
             SendMessage("Discovered services");
             QList<QLowEnergyCharacteristic> characteristics = m_service->characteristics();
 
@@ -201,6 +204,7 @@ void Service::onCharacteristicChanged(const QLowEnergyCharacteristic &info, cons
                     SendMessage("CODE_SKIP_FILE: " + m_file_name_list[m_file_index]);
                     SendCmdKeyData(CMD_HEAD_OTA, OTA_SEND_START);
                 } else {
+                    m_ota_finished = true;
                     emit upgradeResult(true, m_address);
                 }
             } else {
@@ -235,7 +239,7 @@ void Service::onCharacteristicChanged(const QLowEnergyCharacteristic &info, cons
                 emit recvOTABodyReply();
             } else {
                 qCritical() << m_address << "check sum fail";
-                emit upgradeResult(false, m_address);
+                //emit upgradeResult(false, m_address);
             }
             break;
         case OTA_SEND_END:
@@ -256,7 +260,6 @@ void Service::onCharacteristicChanged(const QLowEnergyCharacteristic &info, cons
             }
             break;
         case OTA_SET_OFFSET:
-            m_set_offset = false;
             break;
         case OTA_SET_PRN:
             if (0 != value[2]) {//成功获取PRN
@@ -265,6 +268,7 @@ void Service::onCharacteristicChanged(const QLowEnergyCharacteristic &info, cons
             }
             break;
         case OTA_SET_PROGRESS:
+            emit startOTA(m_address);
             SendCmdKeyData(CMD_HEAD_OTA, OTA_SEND_START);
             break;
         default:
@@ -430,7 +434,7 @@ void Service::StartSendData()
         byte.append(data);
         WriteCharacteristic(m_characteristics, byte);
         if (m_package_num >= m_device_prn) {
-            if (!WaitReplyData2(5))
+            if (!WaitOTABodyReply(5))
             {
                 qCritical() << m_address
                             << "recv d1 02 time out";
@@ -439,13 +443,6 @@ void Service::StartSendData()
             }
 
             if (m_set_offset) {
-                if (!WaitReplyData2(5))
-                {
-                    qCritical() << m_address
-                                << "recv d1 04 time out";
-                    emit disconnectDevice();
-                    break ;
-                }
                 i = m_cur_offset - m_device_mtu;
                 m_set_offset = false;
             }
@@ -486,33 +483,7 @@ uchar Service::getFileType(int index)
     return c;
 }
 
-bool Service::WaitReplyData(int secTimeout)
-{
-    bool flag = false;
-#if 0
-    QTimer timer;
-    QEventLoop eventloop;
-    connect(&timer, &QTimer::timeout, &eventloop, &QEventLoop::quit);
-    connect(m_service, &QLowEnergyService::characteristicChanged, &eventloop, &QEventLoop::quit);
-    timer.setSingleShot(true);
-    timer.start(secTimeout * 1000);
-    eventloop.exec();
-    if (timer.isActive()) {
-        flag = true;
-    }
-    timer.stop();
-#else
-    m_timer->start(secTimeout * 1000);
-    m_eventloop->exec();
-    if (m_timer->isActive()) {
-        flag = true;
-    }
-    m_timer->stop();
-#endif
-    return flag;
-}
-
-bool Service::WaitReplyData2(int secTimeout)
+bool Service::WaitOTABodyReply(int secTimeout)
 {
     bool reply_succ = true;
 

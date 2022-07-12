@@ -45,7 +45,7 @@ private slots:
     void on_pushButton_2_clicked();
 
 signals:
-    void ConnectDevice(const QBluetoothDeviceInfo &info);
+    void ConnectDevice(const QBluetoothDeviceInfo &info, int timeout);
 
 private:
     void startAgentScan();
@@ -72,5 +72,8 @@ private:
     int m_successcount = 0;
     int m_failcount = 0;
     int m_queuemax = 7;
+
+    //controller start time out, seconds
+    int m_startTimeout = 30;
 };
 #endif // MAINWINDOW_H

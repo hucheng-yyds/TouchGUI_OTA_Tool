@@ -4,6 +4,7 @@
 #include <QObject>
 #include <QBluetoothDeviceDiscoveryAgent>
 #include <QTimer>
+#include <QPointer>
 
 class Agent : public QObject
 {
@@ -33,12 +34,14 @@ signals:
     void message(QString msg);
 
 private:
-    QBluetoothDeviceDiscoveryAgent *m_agent;
+    //QBluetoothDeviceDiscoveryAgent *m_agent;
+    QPointer<QBluetoothDeviceDiscoveryAgent> m_agent;
     QStringList m_address_list;
     int m_address_size = 0;
     int m_find_count = 0;
     bool m_not_find = true;
-    QTimer *m_timer = nullptr;
+    //QTimer *m_timer = nullptr;
+    QPointer<QTimer> m_timer;
     QString m_match_str;
 
     int m_targetcount = 0;

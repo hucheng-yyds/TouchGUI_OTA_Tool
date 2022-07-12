@@ -13,7 +13,7 @@ public:
     ~Controller();
 
     void SetProperty(QByteArrayList &data, QByteArrayList &name, int size, QByteArray &version);
-    void ConnectDevice(const QBluetoothDeviceInfo &info);
+    void ConnectDevice(const QBluetoothDeviceInfo &info, int timeout);
     void DisconnectDevice(void);
 
     QLowEnergyService *CreateService(QBluetoothUuid);
@@ -35,18 +35,21 @@ private slots:
     bool WaitServiceStartOTAReply(int secTimeout);
     void deviceError();
 signals:
-    void message(QString msg);;
+    void message(QString msg);
     void serviceDiscovered(QLowEnergyService *service, const QString &address);
     void upgradeResult(bool success, const QString &address);
+    void startError();
 
 private:
     QThread *m_thread = nullptr;
-    QLowEnergyController *m_controller = nullptr;
+    //QLowEnergyController *m_controller = nullptr;
+    QPointer<QLowEnergyController> m_controller;
     QBluetoothDeviceInfo m_device_info;
     Service *m_service = nullptr;
     int m_timeout_count = 3;
 
     bool m_startOTA = false;
+    bool m_startError = false;
 };
 
 #endif // CONTROLLER_H

@@ -4,10 +4,10 @@
 Agent::Agent(QObject *parent) : QObject(parent)
 {
     m_agent = new QBluetoothDeviceDiscoveryAgent(this);
-    m_timer = new QTimer(this);
-    connect(m_timer, &QTimer::timeout, this, [this]() {
-        m_agent->start(QBluetoothDeviceDiscoveryAgent::LowEnergyMethod);
-    });
+//    m_timer = new QTimer(this);
+//    connect(m_timer, &QTimer::timeout, this, [this]() {
+//        m_agent->start(QBluetoothDeviceDiscoveryAgent::LowEnergyMethod);
+//    });
 
     if(m_agent)
     {
@@ -26,7 +26,7 @@ void Agent::startScanDevice(uint32_t timeOut, const QStringList &address)
         m_agent->setLowEnergyDiscoveryTimeout(timeOut);
         m_agent->start(QBluetoothDeviceDiscoveryAgent::LowEnergyMethod);
         SendMessage("startScan...");
-        m_timer->start(10 * 1000 + timeOut);
+        //m_timer->start(10 * 1000 + timeOut);
 //        int i = 0;
 //        for (const auto &string : address) {
 //            QBluetoothAddress mac(string);
@@ -45,13 +45,15 @@ void Agent::startScanDevice(uint32_t timeOut, const QStringList &address)
 void Agent::stopScan()
 {
     m_agent->stop();
-    m_timer->stop();
+    //m_timer->stop();
     SendMessage("stopScan...");
 }
 
 bool Agent::isActive()
 {
-    return m_timer->isActive() || m_agent->isActive();
+    return
+            //m_timer->isActive() ||
+            m_agent->isActive();
 }
 
 void Agent::setMatchStr(const QString &matchStr)
@@ -105,9 +107,14 @@ void Agent::onFinished()
         m_find_count = 0;
     }
     if (m_successcount >= m_targetcount || m_find_count >= 6) {
-        m_timer->stop();
+        m_agent->stop();
         emit scanFinished();
-        SendMessage("scan stop");
+    }
+    else
+    {
+        m_agent->stop();
+        m_agent->start(QBluetoothDeviceDiscoveryAgent::LowEnergyMethod);
+        SendMessage("scan again");
     }
     m_not_find = true;
 //    const QList<QBluetoothDeviceInfo> foundDevices = m_agent->discoveredDevices();

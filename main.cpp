@@ -7,7 +7,7 @@
 #include <QTextCodec>
 #include <stdio.h>
 
-static QtMsgType g_LogLevel = QtDebugMsg;
+static QtMsgType g_LogLevel = QtWarningMsg;
 
 void myMessageOutput(QtMsgType type, const QMessageLogContext &context, const QString &msg)
 {
