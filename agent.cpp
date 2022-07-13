@@ -42,6 +42,16 @@ void Agent::startScanDevice(uint32_t timeOut, const QStringList &address)
     }
 }
 
+void Agent::restartScan(int secTimeout)
+{
+    if (!m_agent->isActive())
+    {
+        m_agent->setLowEnergyDiscoveryTimeout(secTimeout);
+        m_agent->start(QBluetoothDeviceDiscoveryAgent::LowEnergyMethod);
+        SendMessage("restartScan...");
+    }
+}
+
 void Agent::stopScan()
 {
     m_agent->stop();
@@ -81,7 +91,6 @@ void Agent::onDeviceDiscovered(const QBluetoothDeviceInfo &info)
         }
     }
     emit deviceDiscovered(info);
-    m_address_size ++;
     m_not_find = false;
     QString tmp = "发现设备:";
     QString str = info.address().toString() + " - " + info.name() + " rssi:" + QString::number(info.rssi());
@@ -100,19 +109,20 @@ void Agent::onError(QBluetoothDeviceDiscoveryAgent::Error err)
 
 void Agent::onFinished()
 {
-    SendMessage("scan finished");
+    SendMessage("scan finished, find_count:"
+                +QString::number(m_find_count)
+                +" address list size:"+QString::number(m_address_list.size()));
     if (m_not_find) {
         m_find_count ++;
     } else {
         m_find_count = 0;
     }
+    m_agent->stop();
     if (m_successcount >= m_targetcount || m_find_count >= 6) {
-        m_agent->stop();
         emit scanFinished();
     }
     else
     {
-        m_agent->stop();
         m_agent->start(QBluetoothDeviceDiscoveryAgent::LowEnergyMethod);
         SendMessage("scan again");
     }
@@ -131,4 +141,10 @@ void Agent::onFinished()
 void Agent::onCanceled()
 {
     SendMessage("Agent scan canceled");
+}
+
+void Agent::increaseSuccessCount(const QString & succ_address)
+{
+    m_address_list.removeOne(succ_address);
+    m_successcount++;
 }

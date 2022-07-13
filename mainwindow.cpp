@@ -282,12 +282,12 @@ void MainWindow::onUpgradeResult(bool success, const QString &address)
                 << "row index:" << index;
         delete controller_list[index];
         controller_list.removeAt(index);
-        startAgentScan();
+        restartAgentScan();
         if (success) {
             ui->listWidget->addItem(address);//添加到升级成功列表
             ui->label_33->setText(QString::number(ui->listWidget->count()));
             m_successcount++;
-            agent->increaseSuccessCount();
+            agent->increaseSuccessCount(address);
             QFile file("success_mac.txt");
             if (file.open(QIODevice::ReadWrite|QIODevice::Append))
             {
@@ -370,17 +370,17 @@ void MainWindow::on_pushButton_4_clicked()
     ui->tabWidget->setCurrentIndex(4);
     m_timer->start(1000);
     ui->pushButton_4->setEnabled(false);
-    startAgentScan();
+    agent->startScanDevice(m_scanTimeout * 1000, m_address_list);
 #else
     device->startDeviceDiscovery();
 #endif
 }
 
-void MainWindow::startAgentScan()
+void MainWindow::restartAgentScan()
 {
-    if (agent && !agent->isActive())
+    if (agent)
     {
-        agent->startScanDevice(60 * 1000, m_address_list);
+        agent->restartScan(m_scanTimeout * 1000);
     }
 }
 

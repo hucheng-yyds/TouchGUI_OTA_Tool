@@ -48,7 +48,7 @@ signals:
     void ConnectDevice(const QBluetoothDeviceInfo &info, int timeout);
 
 private:
-    void startAgentScan();
+    void restartAgentScan();
     void stopAgentScan();
 
 private:
@@ -75,5 +75,6 @@ private:
 
     //controller start time out, seconds
     int m_startTimeout = 30;
+    int m_scanTimeout = 60;
 };
 #endif // MAINWINDOW_H

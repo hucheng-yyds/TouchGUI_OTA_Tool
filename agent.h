@@ -18,7 +18,8 @@ public:
     void setMatchStr(const QString &matchStr);
     void setTargetCount(int targetcount){m_targetcount=targetcount;}
     void setSuccessCount(int successcount){m_successcount=successcount;}
-    void increaseSuccessCount(){m_successcount++;}
+    void increaseSuccessCount(const QString & succ_address);
+    void restartScan(int secTimeout);
 
 private:
     void SendMessage(const QString &);
@@ -37,7 +38,6 @@ private:
     //QBluetoothDeviceDiscoveryAgent *m_agent;
     QPointer<QBluetoothDeviceDiscoveryAgent> m_agent;
     QStringList m_address_list;
-    int m_address_size = 0;
     int m_find_count = 0;
     bool m_not_find = true;
     //QTimer *m_timer = nullptr;
