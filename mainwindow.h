@@ -35,7 +35,7 @@ private slots:
     void onDeviceDiscovered(const QBluetoothDeviceInfo &info);
     void onUpgradeResult(bool success, const QString &address);
     void onUpdateTime();
-    void onScanFinished();
+
     void on_pushButton_4_clicked();
     void on_pushButton_3_clicked();
     void on_pushButton_6_clicked();
@@ -46,17 +46,15 @@ private slots:
 
 signals:
     void ConnectDevice(const QBluetoothDeviceInfo &info, int timeout);
+    void stopAgentScan();
+    void startAgentScan();
 
 private:
-    void restartAgentScan();
-    void stopAgentScan();
+    void checkScan();
 
 private:
     Ui::MainWindow *ui;
     Agent *agent;
-//    Controller *controller;
-//    Service *service;
-    Device *device;
     HttpsClient *https;
     QList<Controller *> controller_list;
     QByteArrayList m_file_data_list;
@@ -75,6 +73,8 @@ private:
 
     //controller start time out, seconds
     int m_startTimeout = 30;
+
+    //agent scan timeout
     int m_scanTimeout = 60;
 };
 #endif // MAINWINDOW_H

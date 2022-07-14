@@ -53,11 +53,13 @@ MainWindow::MainWindow(QWidget *parent)
     ui->tableWidget_2->setColumnWidth(0, 200);
     ui->tableWidget->setColumnHidden(0, true);
 #ifndef SAMPLE
+    qInfo() << "main thread";
+
+    connect(this, &MainWindow::stopAgentScan, agent, &Agent::stopAgentScan);
+    connect(this, &MainWindow::startAgentScan, agent, &Agent::startAgentScan);
     connect(agent, &Agent::deviceDiscovered, this, &MainWindow::onDeviceDiscovered);
-    connect(agent, &Agent::scanFinished, this, &MainWindow::onScanFinished);
     connect(m_timer, &QTimer::timeout, this, QOverload<>::of(&MainWindow::onUpdateTime));
 
-    qDebug() << "main thread:" << QThread::currentThreadId();
     ui->label_19->installEventFilter(this);
     ui->label_52->installEventFilter(this);
     QFile file(QCoreApplication::applicationDirPath() + "/setup.txt");
@@ -119,9 +121,9 @@ MainWindow::~MainWindow()
 {
     on_pushButton_6_clicked();
     delete ui;
-    delete agent;
     delete https;
     delete m_timer;
+    delete agent;
 }
 
 void MainWindow::GetDirectoryFile(const QString &dirName)
@@ -250,7 +252,7 @@ void MainWindow::onDeviceDiscovered(const QBluetoothDeviceInfo &info)
     if (controller_list.size() >= m_queuemax) {
         qInfo() << info.address().toString() << "can not connect"
                  << "wait for idle, controller queue:" << controller_list.size();
-        stopAgentScan();
+        emit stopAgentScan();
         return ;
     }
 
@@ -266,6 +268,7 @@ void MainWindow::onDeviceDiscovered(const QBluetoothDeviceInfo &info)
     int rowCount = ui->tableWidget_2->rowCount();
     ui->tableWidget_2->insertRow(rowCount);//添加到正在升级列表
     ui->tableWidget_2->setItem(rowCount, 0, new QTableWidgetItem(info.address().toString()));
+    agent->setProcessingCount(controller_list.size());
 }
 
 void MainWindow::onUpgradeResult(bool success, const QString &address)
@@ -282,7 +285,7 @@ void MainWindow::onUpgradeResult(bool success, const QString &address)
                 << "row index:" << index;
         delete controller_list[index];
         controller_list.removeAt(index);
-        restartAgentScan();
+        agent->setProcessingCount(controller_list.size());
         if (success) {
             ui->listWidget->addItem(address);//添加到升级成功列表
             ui->label_33->setText(QString::number(ui->listWidget->count()));
@@ -295,14 +298,13 @@ void MainWindow::onUpgradeResult(bool success, const QString &address)
                 out << address << '\n';
                 file.close();
             }
-        } else {
-//            int failCount = ui->label_47->text().toInt();
-//            qDebug() << "failCount:" << failCount;
-//            ui->label_47->setText(QString::number(++failCount));//未完成数
+        }
+        else
+        {
             m_failcount++;
         }
     }
-    onScanFinished();
+    checkScan();
 }
 
 void MainWindow::onUpdateTime()
@@ -312,15 +314,21 @@ void MainWindow::onUpdateTime()
     ui->label_34->setText(time.toString("hh:mm:ss"));
 }
 
-void MainWindow::onScanFinished()
+void MainWindow::checkScan()
 {
-    if (!controller_list.isEmpty())
+    int processing_count = controller_list.size();
+    if (agent->isFindCountEnough()
+            && ((processing_count+m_successcount)<m_targetcount))
+    {
+        emit startAgentScan();
+    }
+    if (processing_count > 0)
     {
         return;
     }
-    if (m_successcount >= m_targetcount || !agent->isActive()) {//全部升级完成
+    if (m_successcount >= m_targetcount || !agent->isFindCountEnough()) {//全部升级完成
         m_timer->stop();
-        stopAgentScan();
+        emit stopAgentScan();
         ui->tabWidget->setCurrentIndex(5);
         ui->label_46->setText(QString::number(ui->listWidget->count()));//已完成数
         ui->label_49->setText(ui->label_34->text());//总耗时
@@ -370,26 +378,12 @@ void MainWindow::on_pushButton_4_clicked()
     ui->tabWidget->setCurrentIndex(4);
     m_timer->start(1000);
     ui->pushButton_4->setEnabled(false);
-    agent->startScanDevice(m_scanTimeout * 1000, m_address_list);
+
+    agent->initScanData(m_scanTimeout * 1000, m_address_list);
+    emit startAgentScan();
 #else
     device->startDeviceDiscovery();
 #endif
-}
-
-void MainWindow::restartAgentScan()
-{
-    if (agent)
-    {
-        agent->restartScan(m_scanTimeout * 1000);
-    }
-}
-
-void MainWindow::stopAgentScan()
-{
-    if (agent)
-    {
-        agent->stopScan();
-    }
 }
 
 void MainWindow::on_pushButton_3_clicked()

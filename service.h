@@ -49,6 +49,14 @@ public:
     uchar getFileType(int index);
     uint32_t CheckSum(uint8_t *pBuffer, uint8_t len);
 
+public:
+    enum ResultState {
+        SuccessOTA = 0,
+        LowEnergy,
+        HighVersion,
+        ConnectionException
+    };
+
 private slots:
     void onStateChanged(QLowEnergyService::ServiceState newState);
     void onCharacteristicChanged(const QLowEnergyCharacteristic &info,

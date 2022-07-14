@@ -4,6 +4,7 @@
 #include <QLowEnergyController>
 #include <QBluetoothDeviceInfo>
 #include "service.h"
+#include <QTimer>
 
 class Controller : public QObject
 {
@@ -31,14 +32,18 @@ private slots:
     void onDiscoveryFinished();
     void onConnectionUpdated(const QLowEnergyConnectionParameters &parameters);
     void onReconnectDevice();
+    void onStartOTA();
+    void onStartOTATimeout();
+    void onStartError();
 
-    bool WaitServiceStartOTAReply(int secTimeout);
-    void deviceError();
 signals:
     void message(QString msg);
     void serviceDiscovered(QLowEnergyService *service, const QString &address);
     void upgradeResult(bool success, const QString &address);
     void startError();
+
+private:
+    void deviceError();
 
 private:
     QThread *m_thread = nullptr;
@@ -50,6 +55,8 @@ private:
 
     bool m_startOTA = false;
     bool m_startError = false;
+
+    QPointer<QTimer> m_startOTATimer;
 };
 
 #endif // CONTROLLER_H

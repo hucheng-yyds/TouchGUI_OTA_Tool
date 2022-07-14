@@ -6,6 +6,7 @@
 #include <QMutex>
 #include <QTextCodec>
 #include <stdio.h>
+#include <QThread>
 
 static QtMsgType g_LogLevel = QtWarningMsg;
 
@@ -46,11 +47,11 @@ void myMessageOutput(QtMsgType type, const QMessageLogContext &context, const QS
         break;
     }
 
-    QByteArray localMsg = msg.toLocal8Bit();
     //win console printer
     fprintf(fp, "%s%s %d %d %s\n",
             strLevel.toStdString().c_str(),
-            strDate.toStdString().c_str(), type, g_LogLevel, localMsg.constData());
+            strDate.toStdString().c_str(),
+            type, g_LogLevel, msg.toStdString().c_str());
     fflush(fp);
 
     //write msg to log file
@@ -62,7 +63,8 @@ void myMessageOutput(QtMsgType type, const QMessageLogContext &context, const QS
         QTextStream out(&logfile);
         out.setCodec(QTextCodec::codecForName("UTF-8"));
         out << strLevel << strDate << " "
-            << localMsg.constData()
+            << QThread::currentThreadId() << " "
+            << msg
             << "\n";
         logfile.flush();
         logfile.close();

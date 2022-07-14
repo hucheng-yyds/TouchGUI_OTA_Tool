@@ -12,6 +12,8 @@ Controller::Controller(QObject *parent) : QObject(parent)
     connect(this, &Controller::serviceDiscovered, m_service, &Service::ConnectService);
     connect(m_service, &Service::disconnectDevice, this, &Controller::DisconnectDevice);
     connect(m_service, &Service::upgradeResult, this, &Controller::upgradeResult);
+    connect(m_service, &Service::startOTA, this, &Controller::onStartOTA);
+    connect(this, &Controller::startError, this, &Controller::onStartError);
     m_thread->start();
 }
 
@@ -66,38 +68,17 @@ void Controller::ConnectDevice(const QBluetoothDeviceInfo &info, int timeout)
     connect(m_controller, SIGNAL(discoveryFinished()), this, SLOT(onDiscoveryFinished()));
     connect(m_controller, SIGNAL(connectionUpdated(QLowEnergyConnectionParameters)), this, SLOT(onConnectionUpdated(QLowEnergyConnectionParameters)));
 
-    m_controller->connectToDevice();
-    SendMessage("ConnectDevice timeout:"+QString::number(timeout));
+    m_startOTATimer = new QTimer();
+    connect(m_startOTATimer, &QTimer::timeout, this, &Controller::onStartOTATimeout);
 
-    if (!WaitServiceStartOTAReply(timeout))
-    {
-        qWarning() << "Controller:" << info.address().toString()
-                 << QThread::currentThreadId() << "service start failed and timeout";
-        deviceError();
-    }
-    else
-    {
-        if (m_startError)
-        {
-            qWarning() << "Controller:" << info.address().toString()
-                     << QThread::currentThreadId() << "start error";
-            deviceError();
-        }
-        else
-        {
-            SendMessage("service begin to ota");
-            m_startOTA = true;
-        }
-    }
+    m_controller->connectToDevice();
+    m_startOTATimer->start(timeout*1000);
+    SendMessage("ConnectDevice timeout:"+QString::number(timeout));
 }
 
 void Controller::DisconnectDevice()
 {
     deviceError();
-//    if (m_controller)
-//    {
-//        m_controller->disconnectFromDevice();
-//    }
 }
 
 QLowEnergyService * Controller::CreateService(QBluetoothUuid serviceUUID)
@@ -115,7 +96,7 @@ QLowEnergyService * Controller::CreateService(QBluetoothUuid serviceUUID)
 void Controller::SendMessage(const QString &str)
 {
     qInfo() << "Controller:" << m_device_info.address().toString()
-             << QThread::currentThreadId() << str;
+            << str;
     emit message(str);
 }
 
@@ -174,14 +155,15 @@ void Controller::onError(QLowEnergyController::Error newError)
         str += m_controller->errorString();
 
         qWarning() << "Controller:" << m_controller->remoteAddress().toString()
-                 << QThread::currentThreadId() << str;
+                   << str;
         if (m_startOTA)
         {
+            //the error after ota
             DisconnectDevice();
         }
         else
         {
-            m_startError = true;
+            //ota is not beginning
             emit startError();
         }
     }
@@ -196,26 +178,29 @@ void Controller::onServiceDiscovered(QBluetoothUuid serviceUUID)
     }
 }
 
-bool Controller::WaitServiceStartOTAReply(int secTimeout)
+void Controller::onStartError()
 {
-    if (m_service == nullptr)
+    m_startOTATimer->stop();
+    qWarning() << "Controller:" << m_device_info.address().toString()
+               << "start error";
+    deviceError();
+}
+
+void Controller::onStartOTA()
+{
+    m_startOTATimer->stop();
+    SendMessage("service begin to ota");
+    m_startOTA = true;
+}
+
+void Controller::onStartOTATimeout()
+{
+    if (!m_startOTA)
     {
-        return false;
+        qWarning() << "Controller:" << m_device_info.address().toString()
+                   << "start ota timeout";
+        deviceError();
     }
-    bool reply_succ = true;
-
-    QEventLoop eventloop;
-    connect(m_service, &Service::startOTA, &eventloop, &QEventLoop::quit);
-    connect(this, &Controller::startError, &eventloop, &QEventLoop::quit);
-
-    QTimer timer;
-    timer.setSingleShot(true);
-    connect(&timer, &QTimer::timeout, [&eventloop,&reply_succ]{reply_succ=false; eventloop.quit();});
-    timer.start(secTimeout * 1000);
-
-    eventloop.exec();
-    timer.stop();
-    return reply_succ;
 }
 
 void Controller::onDiscoveryFinished()

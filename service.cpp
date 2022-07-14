@@ -27,9 +27,8 @@ void Service::ConnectService(QLowEnergyService * service, const QString &address
     if(m_service)
     {
         auto state = m_service->state();
-        //SendMessage("Service::ConnectService state:" + QString::number(state));
-        qInfo() << m_address << QThread::currentThreadId()
-                << "Service::ConnectService state:" << state;
+        qInfo() << m_address
+                << "ConnectService state:" << state;
         if(state == QLowEnergyService::ServiceDiscovered)
         {
             onStateChanged(QLowEnergyService::ServiceDiscovered);
@@ -52,7 +51,7 @@ void Service::ConnectService(QLowEnergyService * service, const QString &address
 
 void Service::SendMessage(const QString &msg)
 {
-    qInfo() << m_address << QThread::currentThreadId() << msg;
+    qInfo() << "Service:" << m_address << msg;
     emit message(msg);
 }
 
@@ -145,7 +144,7 @@ void Service::onStateChanged(QLowEnergyService::ServiceState newState)
             return;
         }
 
-        qInfo() << m_address << QThread::currentThreadId()
+        qInfo() << m_address
                 << "onStateChanged state:" << newState;
         switch(newState)
         {
@@ -239,7 +238,6 @@ void Service::onCharacteristicChanged(const QLowEnergyCharacteristic &info, cons
                 emit recvOTABodyReply();
             } else {
                 qCritical() << m_address << "check sum fail";
-                //emit upgradeResult(false, m_address);
             }
             break;
         case OTA_SEND_END:
@@ -293,7 +291,7 @@ void Service::onCharacteristicChanged(const QLowEnergyCharacteristic &info, cons
                 if (CompareVersion(m_version, value.mid(8, 12)) <= 0)
                 {
                     qWarning() << m_address
-                             << "device ignore, target version:" << m_version
+                             << "target version:" << m_version
                              << "device version:" << value.mid(8, 12);
                     emit upgradeResult(false, m_address);
                     return;
