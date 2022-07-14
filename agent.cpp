@@ -123,13 +123,13 @@ void Agent::onDeviceDiscovered(const QBluetoothDeviceInfo &info)
     }
     if (m_match_str.isEmpty()) {
         bool find = false;
-        m_address_mutex.lock();
+        //m_address_mutex.lock();
         if (!m_address_list.filter(
                     info.address().toString()
                     ,Qt::CaseInsensitive).isEmpty()) {
             find = true;
         }
-        m_address_mutex.unlock();
+        //m_address_mutex.unlock();
         if (!find)
         {
             return;
@@ -188,8 +188,8 @@ void Agent::onCanceled()
 
 void Agent::increaseSuccessCount(const QString & succ_address)
 {
-    m_address_mutex.lock();
+    //m_address_mutex.lock();
     m_address_list.removeOne(succ_address);
     m_successcount++;
-    m_address_mutex.unlock();
+    //m_address_mutex.unlock();
 }

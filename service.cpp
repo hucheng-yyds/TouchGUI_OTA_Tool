@@ -249,6 +249,7 @@ void Service::onCharacteristicChanged(const QLowEnergyCharacteristic &info, cons
 //                    SendCmdKeyData(CMD_HEAD_SYSTEM, SYSTEM_POWER_OFF);
                     SendCmdKeyData(CMD_HEAD_SYSTEM, SYSTEM_REBOOT);
                     emit upgradeResult(true, m_address);
+                    SendMessage("ota successfully...");
                     break;
                 }
                 SendCmdKeyData(CMD_HEAD_OTA, OTA_SEND_START);
