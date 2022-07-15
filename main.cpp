@@ -22,7 +22,7 @@ void myMessageOutput(QtMsgType type, const QMessageLogContext &context, const QS
 
     QString strDate = QDateTime::currentDateTime().toString("yyyy-MM-dd hh:mm:ss:zzz");
     QString strLevel;
-    FILE * fp = stdout;
+    //FILE * fp = stdout;
     switch (type) {
     case QtDebugMsg:
         strLevel = QString("Debug: ");
@@ -32,15 +32,15 @@ void myMessageOutput(QtMsgType type, const QMessageLogContext &context, const QS
         break;
     case QtWarningMsg:
         strLevel = QString("Warning: ");
-        fp = stderr;
+        //fp = stderr;
         break;
     case QtCriticalMsg:
         strLevel = QString("Critical: ");
-        fp = stderr;
+        //fp = stderr;
         break;
     case QtFatalMsg:
         strLevel = QString("Fatal: ");
-        fp = stderr;
+        //fp = stderr;
         break;
     default:
         strLevel = QString("Default: ");
@@ -48,11 +48,11 @@ void myMessageOutput(QtMsgType type, const QMessageLogContext &context, const QS
     }
 
     //win console printer
-    fprintf(fp, "%s%s %d %d %s\n",
-            strLevel.toStdString().c_str(),
-            strDate.toStdString().c_str(),
-            type, g_LogLevel, msg.toStdString().c_str());
-    fflush(fp);
+//    fprintf(fp, "%s%s %s\n",
+//            strLevel.toStdString().c_str(),
+//            strDate.toStdString().c_str(),
+//            msg.toStdString().c_str());
+//    fflush(fp);
 
     //write msg to log file
     static QMutex m;
@@ -74,7 +74,7 @@ void myMessageOutput(QtMsgType type, const QMessageLogContext &context, const QS
 
 QtMsgType convertLogLevel(int level)
 {
-    QtMsgType ret = QtDebugMsg;
+    QtMsgType ret = QtWarningMsg;
     switch (level) {
     case 0:
         ret = QtDebugMsg;
@@ -103,16 +103,14 @@ void setLogLevel()
     if (file.open(QIODevice::ReadWrite)) {
         QTextStream in(&file);
         QString string;
-        int level = 0;
         while (in.readLineInto(&string)) {
             if (!string.indexOf("loglevel:")){
                 string.remove(0, 9);
-                level = string.toInt();
+                g_LogLevel = convertLogLevel(string.toInt());
                 break;
             }
         }
         file.close();
-        g_LogLevel = convertLogLevel(level);
     }
     qDebug() << "setLogLevel: " << g_LogLevel;
 }

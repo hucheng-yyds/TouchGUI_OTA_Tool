@@ -23,6 +23,7 @@ public:
     bool isFindCountEnough() const {return m_find_count < 6;}//没有找到一个设备算一次消耗，找到设备消耗重置为0
     void initScanData(int msTimeout, const QStringList &address);
     void setProcessingCount(int count){m_processingcount = count;}
+    void resetData();
 
 private:
     void SendMessage(const QString &);
@@ -35,21 +36,20 @@ private slots:
     void onError(QBluetoothDeviceDiscoveryAgent::Error err);
     void onFinished(void);
     void onCanceled(void);
-
-private slots:
     void onStopAgentScan();
     void onStartAgentScan();
+    void onBeginTimer();
 
 signals:
     void deviceDiscovered(const QBluetoothDeviceInfo &info);
     void scanFinished();
-    void message(QString msg);
     void stopAgentScan();
     void startAgentScan();
+    void beginTimer();
 
 private:
-    //QBluetoothDeviceDiscoveryAgent *m_agent;
-    QPointer<QBluetoothDeviceDiscoveryAgent> m_agent;
+    QBluetoothDeviceDiscoveryAgent *m_agent;
+    //QPointer<QBluetoothDeviceDiscoveryAgent> m_agent;
 
     QMutex m_address_mutex;
     QStringList m_address_list;

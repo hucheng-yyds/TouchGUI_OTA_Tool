@@ -69,12 +69,12 @@ private:
     int m_targetcount = 0;
     int m_successcount = 0;
     int m_failcount = 0;
-    int m_queuemax = 7;
+    int m_queuemax = 2;
 
     //controller start time out, seconds
     int m_startTimeout = 30;
 
     //agent scan timeout
-    int m_scanTimeout = 60;
+    int m_scanTimeout = 600;
 };
 #endif // MAINWINDOW_H

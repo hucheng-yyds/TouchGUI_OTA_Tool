@@ -277,8 +277,8 @@ void MainWindow::onUpgradeResult(bool success, const QString &address)
     if (!list.isEmpty()) {//单个升级完成
         int index = ui->tableWidget_2->row(list[0]);
         if (-1 == index) {
-            qWarning() << "dont find device";
-            index = 0;
+            qWarning() << "do not find device:" << address;
+            return;
         }
         ui->tableWidget_2->removeRow(index);//从正在升级列表移除
         qInfo() << address << "upgrade result:" << success
@@ -303,8 +303,12 @@ void MainWindow::onUpgradeResult(bool success, const QString &address)
         {
             m_failcount++;
         }
+        checkScan();
     }
-    checkScan();
+    else
+    {
+        qWarning() << "do not find device:" << address;
+    }
 }
 
 void MainWindow::onUpdateTime()

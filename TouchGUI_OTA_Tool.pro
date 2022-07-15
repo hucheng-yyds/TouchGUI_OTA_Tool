@@ -1,6 +1,6 @@
 QT       += core gui bluetooth network
 WIN32:
-CONFIG += console
+#CONFIG += console
 
 greaterThan(QT_MAJOR_VERSION, 4): QT += widgets
 

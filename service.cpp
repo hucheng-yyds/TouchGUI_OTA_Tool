@@ -52,7 +52,6 @@ void Service::ConnectService(QLowEnergyService * service, const QString &address
 void Service::SendMessage(const QString &msg)
 {
     qInfo() << "Service:" << m_address << msg;
-    emit message(msg);
 }
 
 void Service::OpenNotify(QLowEnergyCharacteristic ch, bool flag)
@@ -248,8 +247,8 @@ void Service::onCharacteristicChanged(const QLowEnergyCharacteristic &info, cons
                     m_ota_finished = true;
 //                    SendCmdKeyData(CMD_HEAD_SYSTEM, SYSTEM_POWER_OFF);
                     SendCmdKeyData(CMD_HEAD_SYSTEM, SYSTEM_REBOOT);
-                    emit upgradeResult(true, m_address);
                     SendMessage("ota successfully...");
+                    emit upgradeResult(true, m_address);       
                     break;
                 }
                 SendCmdKeyData(CMD_HEAD_OTA, OTA_SEND_START);

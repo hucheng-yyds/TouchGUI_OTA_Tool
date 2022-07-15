@@ -3,8 +3,8 @@
 
 Agent::Agent(QObject *parent) : QObject(parent)
 {
-    m_agent = new QBluetoothDeviceDiscoveryAgent(this);
-    m_timer = new QTimer();
+    m_agent = new QBluetoothDeviceDiscoveryAgent();
+    m_timer = new QTimer(this);
     connect(m_timer, &QTimer::timeout, this, &Agent::onStartAgentScan);
     connect(m_agent, SIGNAL(deviceDiscovered(QBluetoothDeviceInfo)), this, SLOT(onDeviceDiscovered(QBluetoothDeviceInfo)));
     connect(m_agent, SIGNAL(error(QBluetoothDeviceDiscoveryAgent::Error)), this, SLOT(onError(QBluetoothDeviceDiscoveryAgent::Error)));
@@ -13,6 +13,7 @@ Agent::Agent(QObject *parent) : QObject(parent)
 
     connect(this, &Agent::startAgentScan, this, &Agent::onStartAgentScan);
     connect(this, &Agent::stopAgentScan, this, &Agent::onStopAgentScan);
+    connect(this, &Agent::beginTimer, this, &Agent::onBeginTimer);
 }
 
 Agent::~Agent()
@@ -71,11 +72,16 @@ void Agent::onStopAgentScan()
     stopScan();
 }
 
+void Agent::onBeginTimer()
+{
+    startTimer();
+}
+
 void Agent::startTimer()
 {
     if (!m_timer->isActive())
     {
-        m_timer->start(20*1000);
+        m_timer->start(30*1000);
         SendMessage("scan timer started...");
     }
 }
@@ -159,7 +165,6 @@ void Agent::onError(QBluetoothDeviceDiscoveryAgent::Error err)
 
 void Agent::onFinished()
 {
-    SendMessage("scan finished");
     if (m_not_find) {
         m_find_count ++;
     } else {

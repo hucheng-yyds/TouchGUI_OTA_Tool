@@ -97,7 +97,6 @@ void Controller::SendMessage(const QString &str)
 {
     qInfo() << "Controller:" << m_device_info.address().toString()
             << str;
-    emit message(str);
 }
 
 void Controller::onConnected()
