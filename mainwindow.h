@@ -51,6 +51,7 @@ signals:
 
 private:
     void checkScan();
+    void refreshVCode();
 
 private:
     Ui::MainWindow *ui;
@@ -76,5 +77,9 @@ private:
 
     //agent scan timeout
     int m_scanTimeout = 600;
+
+    //http服务环境配置
+    //0-测试环境， 1-正式环境
+    int m_httpServer = 1;
 };
 #endif // MAINWINDOW_H

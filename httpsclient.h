@@ -21,6 +21,7 @@ public:
     int login(const QString &name, const QString &password, const QString &verifyCode);
     int upgradePackageList(QList<QStringList> &stringList);
     int downloadPackage(const int custOtaId, QString &filename);
+    void setServerIndex(int index);
 
 private:
     void networkRequest(RequestType reqType, const QString &url, QByteArray &data,
@@ -31,6 +32,11 @@ private:
     QString m_token;
     QString m_verifyCode;
     QByteArray m_filename;
+
+    QStringList m_serverAddress;
+    QString m_currentServerAddress;
+
+    int m_serverIndex = 0;
 
 public slots:
     void onNetRequest(QString *data);

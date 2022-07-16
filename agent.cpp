@@ -25,6 +25,16 @@ Agent::~Agent()
     m_timer = nullptr;
 }
 
+void Agent::resetData()
+{
+    m_find_count = 0;
+    m_not_find = true;
+
+    m_targetcount = 0;
+    m_successcount = 0;
+    m_processingcount = 0;
+}
+
 void Agent::initScanData(int msTimeout, const QStringList &address)
 {
     m_address_list = address;

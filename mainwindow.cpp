@@ -11,6 +11,7 @@
 #include <QMessageBox>
 #include <QKeyEvent>
 #include <QOperatingSystemVersion>
+#include <QTextCodec>
 
 //#define SAMPLE
 MainWindow::MainWindow(QWidget *parent)
@@ -86,6 +87,10 @@ MainWindow::MainWindow(QWidget *parent)
             } else if (!string.indexOf("loglevel:"))
             {
                 //main setLogLevel
+            } else if (!string.indexOf("server:"))
+            {
+                string.remove(0, 7);
+                m_httpServer = string.toInt();
             }
             else {
                 m_address_list.append(string);
@@ -101,10 +106,8 @@ MainWindow::MainWindow(QWidget *parent)
 #endif
 
     //init vcode
-    if (https->verificationCode() == 0)
-    {
-        ui->label_52->setPixmap(QPixmap(QString::fromUtf8("a.jpg")));
-    }
+    https->setServerIndex(m_httpServer);
+    refreshVCode();
 
     //get system version
     auto cur_system = QOperatingSystemVersion::current();
@@ -126,14 +129,19 @@ MainWindow::~MainWindow()
     delete agent;
 }
 
-void MainWindow::GetDirectoryFile(const QString &dirName)
+void MainWindow::GetDirectoryFile(const QString &srcDirName)
 {
-    qDebug() << "GetDirectoryFile:" << dirName;
-    if(dirName.isEmpty()) {
+    qDebug() << "GetDirectoryFile:" << srcDirName;
+    if(srcDirName.isEmpty()) {
         return ;
     }
-    QDir dir(dirName);
-    ui->label_19->setText(QDir::current().relativeFilePath(dirName));//显示相对路径
+//    QTextCodec * codec = QTextCodec::codecForName("gbk");
+//    QString dirName = codec->fromUnicode(srcDirName);
+//    qDebug() << "codecForName GB2312:" << srcDirName;
+//    qDebug() << "codecForName result:" << dirName;
+
+    QDir dir(srcDirName);
+    ui->label_19->setText(QDir::current().relativeFilePath(srcDirName));//显示相对路径
     ui->label_30->setText(ui->label_19->text());
     ui->label_39->setText(ui->label_19->text());
     QStringList nameFilters("*.bin");
@@ -164,6 +172,17 @@ QString MainWindow::buildDateTime() const
     return QLocale(QLocale::English).toDateTime(dateTime, "MMM dd yyyyhh:mm:ss").toString(" yyyy.MM.dd");
 }
 
+void MainWindow::refreshVCode()
+{
+    if (https->verificationCode() < 0) {
+        QMessageBox::information(this, "提示", "验证码获取fail", QMessageBox::NoButton);
+    }
+    else
+    {
+        ui->label_52->setPixmap(QPixmap(QString::fromUtf8("a.jpg")));
+    }
+}
+
 bool MainWindow::eventFilter(QObject *obj, QEvent *ev)
 {
     if (ui->label_19 == obj
@@ -176,10 +195,7 @@ bool MainWindow::eventFilter(QObject *obj, QEvent *ev)
         return true;
     } else if (ui->label_52 == obj
                && ev->type() == QEvent::MouseButtonPress) {
-        if (https->verificationCode() < 0) {
-            QMessageBox::information(this, "提示", "验证码获取fail", QMessageBox::NoButton);
-        }
-        ui->label_52->setPixmap(QPixmap(QString::fromUtf8("a.jpg")));
+        refreshVCode();
         return true;
     } else {
         // pass the event on to the parent class
@@ -344,6 +360,7 @@ void MainWindow::checkScan()
     }
 }
 
+//OTA开始升级
 void MainWindow::on_pushButton_4_clicked()
 {
 #ifndef SAMPLE
@@ -395,7 +412,7 @@ void MainWindow::on_pushButton_3_clicked()
 
 }
 
-
+//OTA结束
 void MainWindow::on_pushButton_6_clicked()
 {
 #ifndef SAMPLE
@@ -404,11 +421,8 @@ void MainWindow::on_pushButton_6_clicked()
     ui->tableWidget_2->setRowCount(0);
     ui->listWidget->clear();
     m_timer->stop();
-    stopAgentScan();
-//    for (auto &cont : controller_list) {
-//        delete cont;
-//        cont = nullptr;
-//    }
+    emit stopAgentScan();
+    agent->resetData();
     qDeleteAll(controller_list);
     controller_list.clear();
     ui->pushButton_4->setEnabled(true);
@@ -418,6 +432,7 @@ void MainWindow::on_pushButton_6_clicked()
 }
 
 
+//账号登录
 void MainWindow::on_pushButton_clicked()
 {
     if (ui->lineEdit->text().isEmpty() || ui->lineEdit_2->text().isEmpty()) {
@@ -426,6 +441,7 @@ void MainWindow::on_pushButton_clicked()
     int ret = https->login(ui->lineEdit->text(), ui->lineEdit_2->text(), ui->lineEdit_3->text());
     if (ret < 0) {
         QMessageBox::information(this, "提示", "登录失败", QMessageBox::NoButton);
+        refreshVCode();
         return ;
     }
     QList<QStringList> stringList;
@@ -434,9 +450,7 @@ void MainWindow::on_pushButton_clicked()
         QMessageBox::question(this, "提示", "获取列表失败", QMessageBox::Retry | QMessageBox::Cancel);
         return;
     }
-//    QList<QStringList> stringList;
-//    stringList.append(QStringList() << "11" << "3.2.0"<< ""<< "");
-//    stringList.append(QStringList() << "22" << ""<< ""<< "");
+
     ui->tableWidget->clearContents();
     ui->tableWidget->setRowCount(0);
     qDebug() << "stringList:" << stringList.size();
@@ -472,9 +486,11 @@ void MainWindow::on_pushButton_2_clicked()
         qDebug() << "custOtaId:" << custOtaId << "version:" << version;
         QString dirname;
         if (https->downloadPackage(custOtaId, dirname) < 0) {
-            qWarning() << "download fail";
+            qWarning() << "download fail:";
+            QMessageBox::information(this, "提示", "下载失败", QMessageBox::NoButton);
             return ;
         }
+        qDebug() << "download successfully:" << dirname;
         GetDirectoryFile(dirname);
         ui->label_19->setText(dirname);
         ui->label_20->setText(version);

@@ -3,12 +3,8 @@
 #include <QNetworkReply>
 #include <QFile>
 #include <QJsonArray>
+#include <QDateTime>
 
-#if 1
-#define SERVER_ADDRESS  "http://47.243.45.185:8988/"
-#else
-#define SERVER_ADDRESS  "http://192.168.20.134:8080/"
-#endif
 
 HttpsClient::HttpsClient(QObject *parent)
     : QObject{parent}
@@ -18,13 +14,30 @@ HttpsClient::HttpsClient(QObject *parent)
 {
     m_requestTimer->setInterval(15 * 1000);
     m_requestTimer->setSingleShot(true);
+
+    //测试环境
+    m_serverAddress.append("http://47.243.45.185:8988/");
+
+    //正式环境
+    m_serverAddress.append("https://paas-ota.touchelx.cn/");
+    m_currentServerAddress = m_serverAddress[m_serverIndex];
+}
+
+void HttpsClient::setServerIndex(int index)
+{
+    if (index < m_serverAddress.size())
+    {
+        m_serverIndex = index;
+    }
+    m_currentServerAddress = m_serverAddress[m_serverIndex];
+    qDebug() << "set server address:" << m_currentServerAddress;
 }
 
 int HttpsClient::verificationCode()
 {
     QByteArray data;
     const QString &url = "touchlink/verification/ordinary";
-    networkRequest(GET, SERVER_ADDRESS + url, data);
+    networkRequest(GET, m_currentServerAddress + url, data);
     if (data.isEmpty()) {
         return -1;
     }
@@ -45,7 +58,7 @@ int HttpsClient::login(const QString &name, const QString &password, const QStri
     document.setObject(jsonObj);
     QByteArray data;
     const QString &url = "touchlink/customer/ota/tool/login";
-    networkRequest(POST, SERVER_ADDRESS + url, data, document);
+    networkRequest(POST, m_currentServerAddress + url, data, document);
     QJsonParseError jsonError;
     document = QJsonDocument::fromJson(data, &jsonError);
     if (jsonError.error == QJsonParseError::NoError) {
@@ -69,7 +82,7 @@ int HttpsClient::upgradePackageList(QList<QStringList> &stringList)
     document.setObject(jsonObj);
     QByteArray data;
     const QString &url = "touchlink/customer/ota/tool/list";
-    networkRequest(POST, SERVER_ADDRESS + url, data, document);
+    networkRequest(POST, m_currentServerAddress + url, data, document);
     QJsonParseError jsonError;
     document = QJsonDocument::fromJson(data, &jsonError);
     if (jsonError.error == QJsonParseError::NoError) {
@@ -84,7 +97,10 @@ int HttpsClient::upgradePackageList(QList<QStringList> &stringList)
                 list << value.toObject()["custOtaPackageName"].toString();
                 list << value.toObject()["custOtaTargetVersion"].toString();
                 list << value.toObject()["custProductCenterName"].toString();
-                list << value.toObject()["createdTime"].toString();
+                //list << value.toObject()["createdTime"].toString();
+                double times = value.toObject()["createdTime"].toDouble();
+                QDateTime date = QDateTime::fromMSecsSinceEpoch(times);
+                list << date.toString("yyyy-MM-dd hh:mm:ss:zzz");
                 stringList << list;
             }
             return 0;
@@ -95,11 +111,13 @@ int HttpsClient::upgradePackageList(QList<QStringList> &stringList)
     return -1;
 }
 
+
+//包含中文的文件名会导致下载失败 2022-7-16 未解决
 int HttpsClient::downloadPackage(const int custOtaId, QString &filename)
 {
     QByteArray data;
     const QString &url = "touchlink/customer/ota/tool/downloadOTA/" + QString::number(custOtaId);
-    networkRequest(GET, SERVER_ADDRESS + url, data);
+    networkRequest(GET, m_currentServerAddress + url, data);
     if (data.isEmpty()) {
         return -1;
     }
@@ -123,6 +141,17 @@ void HttpsClient::networkRequest(RequestType reqType, const QString &url,
     QNetworkRequest request;
     request.setUrl(url);
     request.setHeader(QNetworkRequest::ContentTypeHeader , "application/json");
+    if (url.indexOf("https") == 0)
+    {
+        qDebug()<<"QSslSocket=" << QSslSocket::sslLibraryBuildVersionString();
+        qDebug() << "OpenSSL support:" << QSslSocket::supportsSsl();
+
+        QSslConfiguration sslConf = request.sslConfiguration();
+        sslConf.setPeerVerifyMode(QSslSocket::VerifyNone);
+        sslConf.setProtocol(QSsl::TlsV1SslV3);
+        request.setSslConfiguration(sslConf);
+        qDebug() << "set http ssl configuration";
+    }
     if (m_token.isEmpty()) {
         request.setRawHeader("ordinaryVerifyCode", m_verifyCode.toUtf8());
     } else {
@@ -144,13 +173,13 @@ void HttpsClient::networkRequest(RequestType reqType, const QString &url,
         m_requestTimer->stop();
         if (reply->error() == QNetworkReply::NoError) {
             data = reply->readAll();
-            qDebug() << "request post success";
+            qDebug() << "request success:" << reqType << url;
             for (auto &header : reply->rawHeaderList()) {
                 qDebug() << header << reply->rawHeader(header);
                 if ("Content-Disposition" == header) {
                     QByteArrayList list = reply->rawHeader(header).split('=');
                     m_filename = list.value(1);
-                    qDebug() << "m_filename:" << m_filename;
+                    qDebug() << "filename:" << m_filename;
                 }
             }
         } else {
