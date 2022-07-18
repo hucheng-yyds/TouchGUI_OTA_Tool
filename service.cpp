@@ -241,6 +241,9 @@ void Service::onCharacteristicChanged(const QLowEnergyCharacteristic &info, cons
             break;
         case OTA_SEND_END:
             if (0 == value[2]) {//文件发送完成
+                qInfo() << m_address
+                        << "file_name:" << m_file_name_list[m_file_index]
+                        << "done";
                 StopSendData();
                 m_file_index ++;
                 if (m_file_index >= m_file_data_list.size()) {
@@ -276,7 +279,6 @@ void Service::onCharacteristicChanged(const QLowEnergyCharacteristic &info, cons
         switch ((uchar)value[1]) {
         case PARAM_GET_INFO:
             if (value[7] >= 30 && value[10] == 1) {
-//                SendCmdKeyData(CMD_HEAD_PARAM, PARAM_GET_MTU);
                 SendCmdKeyData(CMD_HEAD_PARAM, PARAM_GET_VER);
             } else {
                 qWarning() << m_address
@@ -286,7 +288,8 @@ void Service::onCharacteristicChanged(const QLowEnergyCharacteristic &info, cons
             }
             break;
         case PARAM_GET_VER:
-            if (!m_version.isEmpty())
+            if (!m_ignore_version_compare
+                    && !m_version.isEmpty())
             {
                 if (CompareVersion(m_version, value.mid(8, 12)) <= 0)
                 {

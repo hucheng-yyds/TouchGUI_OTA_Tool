@@ -12,6 +12,7 @@
 #include <QKeyEvent>
 #include <QOperatingSystemVersion>
 #include <QTextCodec>
+#include <QCheckbox>
 
 //#define SAMPLE
 MainWindow::MainWindow(QWidget *parent)
@@ -278,6 +279,12 @@ void MainWindow::onDeviceDiscovered(const QBluetoothDeviceInfo &info)
 //    controller->start();
     controller_list.append(controller);
     controller->SetProperty(m_file_data_list, m_file_name_list, m_total_file_size, m_version);
+
+    if (ui->checkBox->checkState() == Qt::CheckState::Checked)
+    {
+        controller->setIgnoreVersionCompare();
+        qInfo() << info.address().toString() << "set ignore version compare: true";
+    }
 //    controller->ConnectDevice(info);
     emit ConnectDevice(info, m_startTimeout);
     disconnect(this, &MainWindow::ConnectDevice, controller, &Controller::ConnectDevice);

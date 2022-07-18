@@ -49,6 +49,8 @@ public:
     uchar getFileType(int index);
     uint32_t CheckSum(uint8_t *pBuffer, uint8_t len);
 
+    void setIgnoreVersionCompare(){m_ignore_version_compare=true;}
+
 public:
     enum ResultState {
         SuccessOTA = 0,
@@ -108,6 +110,8 @@ private:
     int m_check_sum = 0;
     int m_cur_sum = 0;
     bool m_ota_finished = false;
+
+    bool m_ignore_version_compare = false;
 };
 
 #endif // SERVICE_H

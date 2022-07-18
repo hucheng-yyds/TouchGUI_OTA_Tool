@@ -19,6 +19,8 @@ public:
 
     QLowEnergyService *CreateService(QBluetoothUuid);
 
+    void setIgnoreVersionCompare();
+
 private:
     void SendMessage(const QString &);
 
