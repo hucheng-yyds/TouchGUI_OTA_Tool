@@ -248,8 +248,14 @@ void Service::onCharacteristicChanged(const QLowEnergyCharacteristic &info, cons
                 m_file_index ++;
                 if (m_file_index >= m_file_data_list.size()) {
                     m_ota_finished = true;
-//                    SendCmdKeyData(CMD_HEAD_SYSTEM, SYSTEM_POWER_OFF);
-                    SendCmdKeyData(CMD_HEAD_SYSTEM, SYSTEM_REBOOT);
+                    if (m_ota_poweroff)
+                    {
+                        SendCmdKeyData(CMD_HEAD_SYSTEM, SYSTEM_POWER_OFF);
+                    }
+                    else
+                    {
+                        SendCmdKeyData(CMD_HEAD_SYSTEM, SYSTEM_REBOOT);
+                    }
                     SendMessage("ota successfully...");
                     emit upgradeResult(true, m_address);       
                     break;

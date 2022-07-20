@@ -39,6 +39,11 @@ void Controller::setIgnoreVersionCompare()
     m_service->setIgnoreVersionCompare();
 }
 
+void Controller::setOTAPoweroff()
+{
+    m_service->setOTAPoweroff();
+}
+
 void Controller::SetProperty(QByteArrayList &data, QByteArrayList &name, int size, QByteArray &version)
 {
     m_service->SetProperty(data, name, size, version);

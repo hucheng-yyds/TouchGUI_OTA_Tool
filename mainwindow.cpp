@@ -92,6 +92,13 @@ MainWindow::MainWindow(QWidget *parent)
             {
                 string.remove(0, 7);
                 m_httpServer = string.toInt();
+            } else if (!string.indexOf("poweroff:"))
+            {
+                string.remove(0, 9);
+                if (string.toInt()>0)
+                {
+                    m_ota_poweroff = true;
+                }
             }
             else {
                 m_address_list.append(string);
@@ -284,6 +291,11 @@ void MainWindow::onDeviceDiscovered(const QBluetoothDeviceInfo &info)
     {
         controller->setIgnoreVersionCompare();
         qInfo() << info.address().toString() << "set ignore version compare: true";
+    }
+    if (m_ota_poweroff)
+    {
+        controller->setOTAPoweroff();
+        qInfo() << info.address().toString() << "set ota poweroff: true";
     }
 //    controller->ConnectDevice(info);
     emit ConnectDevice(info, m_startTimeout);

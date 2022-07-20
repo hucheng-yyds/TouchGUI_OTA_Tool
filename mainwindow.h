@@ -81,5 +81,8 @@ private:
     //http服务环境配置
     //0-测试环境， 1-正式环境
     int m_httpServer = 1;
+
+    //ota结束后是否关机
+    bool m_ota_poweroff = false;
 };
 #endif // MAINWINDOW_H

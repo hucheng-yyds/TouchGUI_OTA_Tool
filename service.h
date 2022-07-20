@@ -50,6 +50,7 @@ public:
     uint32_t CheckSum(uint8_t *pBuffer, uint8_t len);
 
     void setIgnoreVersionCompare(){m_ignore_version_compare=true;}
+    void setOTAPoweroff() {m_ota_poweroff=true;}
 
 public:
     enum ResultState {
@@ -112,6 +113,9 @@ private:
     bool m_ota_finished = false;
 
     bool m_ignore_version_compare = false;
+
+    //ota结束后是否关机
+    bool m_ota_poweroff = false;
 };
 
 #endif // SERVICE_H
