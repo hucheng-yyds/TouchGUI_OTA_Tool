@@ -173,6 +173,7 @@ void Agent::onError(QBluetoothDeviceDiscoveryAgent::Error err)
     qWarning() << "Agent" << str;
 }
 
+//触发finished信号 会导致程序crash 2022-7-20 未解决
 void Agent::onFinished()
 {
     if (m_not_find) {

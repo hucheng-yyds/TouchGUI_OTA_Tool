@@ -76,7 +76,7 @@ private:
     int m_startTimeout = 30;
 
     //agent scan timeout
-    int m_scanTimeout = 600;
+    int m_scanTimeout = 1200;
 
     //http服务环境配置
     //0-测试环境， 1-正式环境
