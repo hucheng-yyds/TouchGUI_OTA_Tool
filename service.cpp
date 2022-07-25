@@ -5,6 +5,9 @@
 
 Service::Service(QObject *parent) : QObject(parent)
 {
+    QString tmp = "S.22B.51.66";
+    m_oy22b_tpversion = tmp.toUtf8();
+    m_oy22b_tpversion.resize(12);
 }
 
 Service::~Service()
@@ -42,7 +45,7 @@ void Service::ConnectService(QLowEnergyService * service, const QString &address
             //connect(m_service, SIGNAL(descriptorRead(QLowEnergyDescriptor, QByteArray)), this, SLOT(onDescriptorRead(QLowEnergyDescriptor, QByteArray)));
             //connect(m_service, SIGNAL(descriptorWritten(QLowEnergyDescriptor, QByteArray)), this, SLOT(onDescriptorWritten(QLowEnergyDescriptor, QByteArray)));
             connect(m_service, SIGNAL(error(QLowEnergyService::ServiceError)), this, SLOT(onError(QLowEnergyService::ServiceError)));
-            QThread::msleep(500);
+            //QThread::msleep(600);
             m_service->discoverDetails();
             SendMessage("discoverDetails");
         }
@@ -297,12 +300,13 @@ void Service::onCharacteristicChanged(const QLowEnergyCharacteristic &info, cons
             if (!m_ignore_version_compare
                     && !m_version.isEmpty())
             {
-                if (CompareVersion(m_version, value.mid(8, 12)) <= 0)
+                if (CompareVersion(m_version, value.mid(8, 12)) <= 0
+                        && (CompareVersion(m_oy22b_tpversion, value.mid(8, 12)) != 0))
                 {
                     qWarning() << m_address
                              << "target version:" << m_version
                              << "device version:" << value.mid(8, 12);
-                    emit upgradeResult(false, m_address);
+                    emit upgradeResult(true, m_address);
                     return;
                 }
             }

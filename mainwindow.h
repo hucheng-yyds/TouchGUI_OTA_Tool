@@ -73,7 +73,7 @@ private:
     int m_queuemax = 2;
 
     //controller start time out, seconds
-    int m_startTimeout = 30;
+    int m_startTimeout = 180;
 
     //agent scan timeout
     int m_scanTimeout = 1200;

@@ -116,6 +116,8 @@ private:
 
     //ota结束后是否关机
     bool m_ota_poweroff = false;
+
+    QByteArray m_oy22b_tpversion;
 };
 
 #endif // SERVICE_H

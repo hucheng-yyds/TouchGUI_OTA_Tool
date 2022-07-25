@@ -62,6 +62,9 @@ MainWindow::MainWindow(QWidget *parent)
     connect(agent, &Agent::deviceDiscovered, this, &MainWindow::onDeviceDiscovered);
     connect(m_timer, &QTimer::timeout, this, QOverload<>::of(&MainWindow::onUpdateTime));
 
+    //本地OTA，适合工厂中无网络情况
+    bool ota_local = false;
+
     ui->label_19->installEventFilter(this);
     ui->label_52->installEventFilter(this);
     QFile file(QCoreApplication::applicationDirPath() + "/setup.txt");
@@ -99,6 +102,14 @@ MainWindow::MainWindow(QWidget *parent)
                 {
                     m_ota_poweroff = true;
                 }
+            } else if (!string.indexOf("local:"))
+            {
+                string.remove(0, 6);
+                if (string.toInt()>0)
+                {
+                    ota_local = true;
+                    qInfo() << "set ota local:true";
+                }
             }
             else {
                 m_address_list.append(string);
@@ -115,7 +126,10 @@ MainWindow::MainWindow(QWidget *parent)
 
     //init vcode
     https->setServerIndex(m_httpServer);
-    refreshVCode();
+    if (!ota_local)
+    {
+        refreshVCode();
+    }
 
     //get system version
     auto cur_system = QOperatingSystemVersion::current();
@@ -273,11 +287,16 @@ void MainWindow::onDeviceDiscovered(const QBluetoothDeviceInfo &info)
         qInfo() << info.address().toString() << "has already finished";
         return ;
     }
-    if (controller_list.size() >= m_queuemax) {
+    int current_queue = controller_list.size();
+    if (current_queue >= m_queuemax) {
         qInfo() << info.address().toString() << "can not connect"
                  << "wait for idle, controller queue:" << controller_list.size();
         emit stopAgentScan();
         return ;
+    }
+    else if ((m_queuemax-current_queue) == 1)
+    {
+        emit stopAgentScan();
     }
 
     Controller *controller = new Controller;
@@ -331,12 +350,22 @@ void MainWindow::onUpgradeResult(bool success, const QString &address)
             {
                 QTextStream out(&file);
                 out << address << '\n';
+                file.flush();
                 file.close();
             }
         }
         else
         {
             m_failcount++;
+            agent->increaseFailCount(address);
+            QFile file("fail_mac.txt");
+            if (file.open(QIODevice::Append))
+            {
+                QTextStream out(&file);
+                out << address << '\n';
+                file.flush();
+                file.close();
+            }
         }
         checkScan();
     }
@@ -357,7 +386,7 @@ void MainWindow::checkScan()
 {
     int processing_count = controller_list.size();
     if (agent->isFindCountEnough()
-            && ((processing_count+m_successcount)<m_targetcount))
+            && ((processing_count+m_successcount+m_failcount)<m_targetcount))
     {
         emit startAgentScan();
     }
@@ -365,7 +394,8 @@ void MainWindow::checkScan()
     {
         return;
     }
-    if (m_successcount >= m_targetcount || !agent->isFindCountEnough()) {//全部升级完成
+    if (((m_successcount+m_failcount) >= m_targetcount)
+            || !agent->isFindCountEnough()) {//全部升级完成
         m_timer->stop();
         emit stopAgentScan();
         ui->tabWidget->setCurrentIndex(5);

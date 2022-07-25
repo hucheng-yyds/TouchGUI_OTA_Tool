@@ -19,7 +19,7 @@ HttpsClient::HttpsClient(QObject *parent)
     m_serverAddress.append("http://47.243.45.185:8988/");
 
     //正式环境
-    m_serverAddress.append("https://paas-ota.touchelx.cn/");
+    m_serverAddress.append("https://paas-ota.touchgui.cn/");
     m_currentServerAddress = m_serverAddress[m_serverIndex];
 }
 

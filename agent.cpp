@@ -50,18 +50,18 @@ void Agent::startScanDevice(uint32_t timeOut, const QStringList &address)
         m_agent->start(QBluetoothDeviceDiscoveryAgent::LowEnergyMethod);
         SendMessage("startScan...");
         //m_timer->start(10 * 1000 + timeOut);
-//        int i = 0;
-//        for (const auto &string : address) {
-//            QBluetoothAddress mac(string);
-//            if (mac.isNull()) {
-//                continue ;
-//            }
-//            const QBluetoothDeviceInfo info(mac, "", 0);
-//            emit deviceDiscovered(info);
-//            if (++ i >= 7) {
-//                break ;
-//            }
-//        }
+        int i = 0;
+        for (const auto &string : address) {
+            QBluetoothAddress mac(string);
+            if (mac.isNull()) {
+                continue ;
+            }
+            const QBluetoothDeviceInfo info(mac, "", 0);
+            emit deviceDiscovered(info);
+            if (++ i >= 2) {
+                break ;
+            }
+        }
     }
 }
 
@@ -72,6 +72,24 @@ void Agent::onStartAgentScan()
     try {
         m_agent->start(QBluetoothDeviceDiscoveryAgent::LowEnergyMethod);
         SendMessage("scan started...");
+
+        int i = 0;
+        QStringList address = m_address_list;
+        for (const auto &string : address) {
+            QBluetoothAddress mac(string);
+            if (mac.isNull()) {
+                continue ;
+            }
+            const QBluetoothDeviceInfo info(mac, "", 0);
+            emit deviceDiscovered(info);
+            if (++ i >= 2) {
+                break ;
+            }
+        }
+        if (address.isEmpty())
+        {
+            m_find_count = 7;
+        }
     } catch (...) {
         SendMessage("start scan error exception...");
     }
@@ -204,8 +222,12 @@ void Agent::onCanceled()
 
 void Agent::increaseSuccessCount(const QString & succ_address)
 {
-    //m_address_mutex.lock();
     m_address_list.removeOne(succ_address);
     m_successcount++;
-    //m_address_mutex.unlock();
+}
+
+void Agent::increaseFailCount(const QString & succ_address)
+{
+    m_address_list.removeOne(succ_address);
+    m_failcount++;
 }
