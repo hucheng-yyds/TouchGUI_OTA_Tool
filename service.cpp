@@ -139,7 +139,7 @@ void Service::onStateChanged(QLowEnergyService::ServiceState newState)
 {
     if(m_service)
     {
-        if (m_ota_finished)
+        if (m_ota_finished && !m_ota_poweroff)
         {
             SendMessage("OTA is already finished...");
             emit upgradeResult(true, m_address);
@@ -251,6 +251,8 @@ void Service::onCharacteristicChanged(const QLowEnergyCharacteristic &info, cons
                 m_file_index ++;
                 if (m_file_index >= m_file_data_list.size()) {
                     m_ota_finished = true;
+                    emit upgradeResult(true, m_address);
+
                     if (m_ota_poweroff)
                     {
                         SendCmdKeyData(CMD_HEAD_SYSTEM, SYSTEM_POWER_OFF);
@@ -259,8 +261,7 @@ void Service::onCharacteristicChanged(const QLowEnergyCharacteristic &info, cons
                     {
                         SendCmdKeyData(CMD_HEAD_SYSTEM, SYSTEM_REBOOT);
                     }
-                    SendMessage("ota successfully...");
-                    emit upgradeResult(true, m_address);       
+                    SendMessage("ota successfully...");  
                     break;
                 }
                 SendCmdKeyData(CMD_HEAD_OTA, OTA_SEND_START);

@@ -41,31 +41,6 @@ void Agent::initScanData(int msTimeout, const QStringList &address)
     m_agent->setLowEnergyDiscoveryTimeout(msTimeout);
 }
 
-void Agent::startScanDevice(uint32_t timeOut, const QStringList &address)
-{
-    if(m_agent)
-    {
-        m_address_list = address;
-        m_agent->setLowEnergyDiscoveryTimeout(timeOut);
-        m_agent->start(QBluetoothDeviceDiscoveryAgent::LowEnergyMethod);
-        SendMessage("startScan...");
-        //m_timer->start(10 * 1000 + timeOut);
-        int i = 0;
-        for (const auto &string : address) {
-            QBluetoothAddress mac(string);
-            if (mac.isNull()) {
-                continue ;
-            }
-            //直连方式对于已关机的设备，将无法触发超时连接失败，会进入无限循环等待
-            const QBluetoothDeviceInfo info(mac, "", 0);
-            emit deviceDiscovered(info);
-            if (++ i >= 2) {
-                break ;
-            }
-        }
-    }
-}
-
 void Agent::onStartAgentScan()
 {
     stopTimer();
@@ -74,23 +49,24 @@ void Agent::onStartAgentScan()
         m_agent->start(QBluetoothDeviceDiscoveryAgent::LowEnergyMethod);
         SendMessage("scan started...");
 
-        int i = 0;
-        QStringList address = m_address_list;
-        for (const auto &string : address) {
-            QBluetoothAddress mac(string);
-            if (mac.isNull()) {
-                continue ;
-            }
-            const QBluetoothDeviceInfo info(mac, "", 0);
-            emit deviceDiscovered(info);
-            if (++ i > m_queuemax) {
-                break ;
-            }
-        }
-        if (address.isEmpty())
-        {
-            m_find_count = 7;
-        }
+        //直连问题多！controller析构无法正常调用
+//        int i = 0;
+//        QStringList address = m_address_list;
+//        for (const auto &string : address) {
+//            QBluetoothAddress mac(string);
+//            if (mac.isNull()) {
+//                continue ;
+//            }
+//            const QBluetoothDeviceInfo info(mac, "", 0);
+//            emit deviceDiscovered(info);
+//            if (++ i > m_queuemax) {
+//                break ;
+//            }
+//        }
+//        if (address.isEmpty())
+//        {
+//            m_find_count = 7;
+//        }
     } catch (...) {
         SendMessage("start scan error exception...");
     }
@@ -203,7 +179,7 @@ void Agent::onFinished()
     m_not_find = true; 
 
     if (isFindCountEnough()
-            && ((m_processingcount+m_successcount)<m_targetcount))
+            && ((m_processingcount+m_successcount+m_failcount)<m_targetcount))
     {
         startTimer();
     }
@@ -213,6 +189,7 @@ void Agent::onFinished()
     }
     qInfo() << "processing_count:" << m_processingcount
             << "success_count:" << m_successcount
+            << "fail_count:" << m_failcount
             << "target_count:" << m_targetcount;
 }
 

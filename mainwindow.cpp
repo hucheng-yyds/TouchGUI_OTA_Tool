@@ -131,13 +131,32 @@ MainWindow::MainWindow(QWidget *parent)
                 continue;
             }
             m_address_list.append(string);
-            qInfo() << string;
+            qInfo() << "add fai mac:" << string;
         }
         failfile.close();
     }
 
     //去重
     m_address_list.removeDuplicates();
+
+    //删除上次OTA成功的mac
+    QFile succfile("success_mac.txt");
+    if (succfile.open(QIODevice::ReadOnly)) {
+        QTextStream in(&succfile);
+        QString string;
+        while (in.readLineInto(&string)) {
+            if (!string.indexOf("#")
+                    || string.isEmpty()) {
+                continue;
+            }
+            m_address_list.removeOne(string);
+            qInfo() << "delete succ mac:" << string;
+        }
+        succfile.close();
+    }
+    QFile mfile("success_mac.txt");
+    mfile.open(QIODevice::ReadWrite | QIODevice::Truncate);
+    mfile.close();
 
     GetDirectoryFile(ui->label_19->text());
 #else

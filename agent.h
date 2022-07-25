@@ -14,7 +14,6 @@ class Agent : public QObject
 public:
     explicit Agent(QObject *parent = nullptr);
     ~Agent();
-    void startScanDevice(uint32_t timeOut, const QStringList &address);
     bool isActive();
     void setMatchStr(const QString &matchStr);
     void setTargetCount(int targetcount){m_targetcount=targetcount;}

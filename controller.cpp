@@ -122,7 +122,10 @@ void Controller::onConnected()
 
 void Controller::deviceError()
 {
-    m_startOTATimer->stop();
+    if (m_startOTATimer->isActive())
+    {
+        m_startOTATimer->stop();
+    }
     emit upgradeResult(false, m_device_info.address().toString());
 }
 
