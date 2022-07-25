@@ -136,6 +136,22 @@ MainWindow::MainWindow(QWidget *parent)
         failfile.close();
     }
 
+    //添加扫描枪录入的mac地址
+    QFile macfile("mac.txt");
+    if (macfile.open(QIODevice::ReadOnly)) {
+        QTextStream in(&macfile);
+        QString string;
+        while (in.readLineInto(&string)) {
+            if (!string.indexOf("#")
+                    || string.isEmpty()) {
+                continue;
+            }
+            m_address_list.append(string);
+            qInfo() << "add QR gun mac:" << string;
+        }
+        macfile.close();
+    }
+
     //去重
     m_address_list.removeDuplicates();
 
@@ -154,9 +170,9 @@ MainWindow::MainWindow(QWidget *parent)
         }
         succfile.close();
     }
-    QFile mfile("success_mac.txt");
-    mfile.open(QIODevice::ReadWrite | QIODevice::Truncate);
-    mfile.close();
+//    QFile mfile("success_mac.txt");
+//    mfile.open(QIODevice::ReadWrite | QIODevice::Truncate);
+//    mfile.close();
 
     GetDirectoryFile(ui->label_19->text());
 #else
