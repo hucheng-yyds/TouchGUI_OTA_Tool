@@ -19,12 +19,13 @@ public:
     void setMatchStr(const QString &matchStr);
     void setTargetCount(int targetcount){m_targetcount=targetcount;}
     void setSuccessCount(int successcount){m_successcount=successcount;}
-    void increaseSuccessCount(const QString & succ_address);
-    void increaseFailCount(const QString & succ_address);
+    void increaseSuccessCount(const QString & address);
+    void increaseFailCount(const QString & address);
     bool isFindCountEnough() const {return m_find_count < 6;}//没有找到一个设备算一次消耗，找到设备消耗重置为0
     void initScanData(int msTimeout, const QStringList &address);
     void setProcessingCount(int count){m_processingcount = count;}
     void resetData();
+    void setQueueMax(int queue){m_queuemax=queue;}
 
 private:
     void SendMessage(const QString &);
@@ -63,6 +64,7 @@ private:
     int m_successcount = 0;
     int m_processingcount = 0;
     int m_failcount = 0;
+    int m_queuemax = 2;
 };
 
 #endif // AGENT_H

@@ -80,10 +80,11 @@ void Controller::ConnectDevice(const QBluetoothDeviceInfo &info, int timeout)
 
     m_startOTATimer = new QTimer();
     connect(m_startOTATimer, &QTimer::timeout, this, &Controller::onStartOTATimeout);
-
-    m_controller->connectToDevice();
     m_startOTATimer->start(timeout*1000);
     SendMessage("ConnectDevice timeout:"+QString::number(timeout));
+
+    m_controller->connectToDevice();
+
 }
 
 void Controller::DisconnectDevice()
@@ -121,6 +122,7 @@ void Controller::onConnected()
 
 void Controller::deviceError()
 {
+    m_startOTATimer->stop();
     emit upgradeResult(false, m_device_info.address().toString());
 }
 
@@ -189,7 +191,6 @@ void Controller::onServiceDiscovered(QBluetoothUuid serviceUUID)
 
 void Controller::onStartError()
 {
-    m_startOTATimer->stop();
     qWarning() << "Controller:" << m_device_info.address().toString()
                << "start error";
     deviceError();

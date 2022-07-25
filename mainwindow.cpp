@@ -116,9 +116,29 @@ MainWindow::MainWindow(QWidget *parent)
             }
             qInfo() << string;
         }
-        m_address_list.removeDuplicates();
+
         file.close();
     }
+
+    //add all fail mac addresses
+    QFile failfile("fail_mac.txt");
+    if (failfile.open(QIODevice::ReadOnly)) {
+        QTextStream in(&failfile);
+        QString string;
+        while (in.readLineInto(&string)) {
+            if (!string.indexOf("#")
+                    || string.isEmpty()) {
+                continue;
+            }
+            m_address_list.append(string);
+            qInfo() << string;
+        }
+        failfile.close();
+    }
+
+    //去重
+    m_address_list.removeDuplicates();
+
     GetDirectoryFile(ui->label_19->text());
 #else
     device = new Device;
@@ -144,7 +164,7 @@ MainWindow::MainWindow(QWidget *parent)
 
 MainWindow::~MainWindow()
 {
-    on_pushButton_6_clicked();
+    //on_pushButton_6_clicked();
     delete ui;
     delete https;
     delete m_timer;
@@ -366,8 +386,13 @@ void MainWindow::onUpgradeResult(bool success, const QString &address)
                 file.flush();
                 file.close();
             }
+            m_fail_address_list.append(address);
         }
         checkScan();
+        qInfo() << "processing_count:" << controller_list.size()
+                << "success_count:" << m_successcount
+                << "fail_count:" << m_failcount
+                << "target_count:" << m_targetcount;
     }
     else
     {
@@ -406,6 +431,29 @@ void MainWindow::checkScan()
         qInfo() << "hourCount:" << hourCount << m_elapsed_second << ui->listWidget->count();
         ui->label_48->setText(QString::number(hourCount, 'f', 0)+" units/hour");//平均速度
         ui->pushButton_4->setEnabled(true);
+
+        saveFailMacAddress();
+    }
+}
+
+void MainWindow::saveFailMacAddress()
+{
+    if (m_fail_address_list.isEmpty())
+    {
+        return;
+    }
+    //overwrite fail mac addresses
+    QFile file("fail_mac.txt");
+    if (file.open(QIODevice::ReadWrite | QIODevice::Truncate))
+    {
+        QTextStream out(&file);
+        for (auto & address : m_fail_address_list)
+        {
+            out << address << '\n';
+            qInfo() << "overwrite fail mac:" << address;
+        }
+        file.flush();
+        file.close();
     }
 }
 
@@ -438,6 +486,13 @@ void MainWindow::on_pushButton_4_clicked()
         QMessageBox::information(this, "提示", "请确认目标数", QMessageBox::NoButton);
         return ;
     }
+
+    //如果目标数小于最大队列数
+    if (m_targetcount < m_queuemax)
+    {
+        m_queuemax = m_targetcount;
+        qInfo() << "reset queue max:" << m_queuemax;
+    }
     m_successcount = 0;
     m_failcount = 0;
 
@@ -450,6 +505,7 @@ void MainWindow::on_pushButton_4_clicked()
     ui->pushButton_4->setEnabled(false);
 
     agent->initScanData(m_scanTimeout * 1000, m_address_list);
+    agent->setQueueMax(m_queuemax);
     emit startAgentScan();
 #else
     device->startDeviceDiscovery();

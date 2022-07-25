@@ -56,6 +56,7 @@ void Agent::startScanDevice(uint32_t timeOut, const QStringList &address)
             if (mac.isNull()) {
                 continue ;
             }
+            //直连方式对于已关机的设备，将无法触发超时连接失败，会进入无限循环等待
             const QBluetoothDeviceInfo info(mac, "", 0);
             emit deviceDiscovered(info);
             if (++ i >= 2) {
@@ -82,7 +83,7 @@ void Agent::onStartAgentScan()
             }
             const QBluetoothDeviceInfo info(mac, "", 0);
             emit deviceDiscovered(info);
-            if (++ i >= 2) {
+            if (++ i > m_queuemax) {
                 break ;
             }
         }
@@ -220,14 +221,14 @@ void Agent::onCanceled()
     SendMessage("scan canceled");
 }
 
-void Agent::increaseSuccessCount(const QString & succ_address)
+void Agent::increaseSuccessCount(const QString & address)
 {
-    m_address_list.removeOne(succ_address);
+    m_address_list.removeOne(address);
     m_successcount++;
 }
 
-void Agent::increaseFailCount(const QString & succ_address)
+void Agent::increaseFailCount(const QString & address)
 {
-    m_address_list.removeOne(succ_address);
+    m_address_list.removeOne(address);
     m_failcount++;
 }

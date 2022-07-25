@@ -52,6 +52,7 @@ signals:
 private:
     void checkScan();
     void refreshVCode();
+    void saveFailMacAddress();
 
 private:
     Ui::MainWindow *ui;
@@ -73,7 +74,7 @@ private:
     int m_queuemax = 2;
 
     //controller start time out, seconds
-    int m_startTimeout = 180;
+    int m_startTimeout = 30;
 
     //agent scan timeout
     int m_scanTimeout = 1200;
@@ -84,5 +85,7 @@ private:
 
     //ota结束后是否关机
     bool m_ota_poweroff = false;
+
+    QStringList m_fail_address_list;
 };
 #endif // MAINWINDOW_H
