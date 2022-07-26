@@ -45,7 +45,7 @@ void Service::ConnectService(QLowEnergyService * service, const QString &address
             //connect(m_service, SIGNAL(descriptorRead(QLowEnergyDescriptor, QByteArray)), this, SLOT(onDescriptorRead(QLowEnergyDescriptor, QByteArray)));
             //connect(m_service, SIGNAL(descriptorWritten(QLowEnergyDescriptor, QByteArray)), this, SLOT(onDescriptorWritten(QLowEnergyDescriptor, QByteArray)));
             connect(m_service, SIGNAL(error(QLowEnergyService::ServiceError)), this, SLOT(onError(QLowEnergyService::ServiceError)));
-            //QThread::msleep(600);
+            QThread::msleep(200);
             m_service->discoverDetails();
             SendMessage("discoverDetails");
         }
@@ -252,6 +252,7 @@ void Service::onCharacteristicChanged(const QLowEnergyCharacteristic &info, cons
                 if (m_file_index >= m_file_data_list.size()) {
                     m_ota_finished = true;
                     emit upgradeResult(true, m_address);
+                    QThread::msleep(100);
 
                     if (m_ota_poweroff)
                     {
@@ -368,6 +369,11 @@ void Service::onError(QLowEnergyService::ServiceError error)
         str += ServiceError[error];
 
         qWarning() << m_address << str;
+        if (m_ota_finished)
+        {
+            //OTA成功后的关机指令可能会触发连接异常
+            return;
+        }
         emit disconnectDevice();
     }
 }

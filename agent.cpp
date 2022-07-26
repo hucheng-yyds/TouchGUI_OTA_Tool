@@ -50,23 +50,24 @@ void Agent::onStartAgentScan()
         SendMessage("scan started...");
 
         //直连问题多！controller析构无法正常调用
-//        int i = 0;
-//        QStringList address = m_address_list;
-//        for (const auto &string : address) {
-//            QBluetoothAddress mac(string);
-//            if (mac.isNull()) {
-//                continue ;
-//            }
-//            const QBluetoothDeviceInfo info(mac, "", 0);
-//            emit deviceDiscovered(info);
-//            if (++ i > m_queuemax) {
-//                break ;
-//            }
-//        }
-//        if (address.isEmpty())
-//        {
-//            m_find_count = 7;
-//        }
+        int i = m_queuemax - m_processingcount;
+        QStringList address = m_address_list;
+        for (const auto &string : address) {
+            QBluetoothAddress mac(string);
+            if (mac.isNull()) {
+                continue ;
+            }
+
+            if (i > 0) {
+                const QBluetoothDeviceInfo info(mac, "", 0);
+                emit deviceDiscovered(info);
+                i--;
+            }
+            else
+            {
+                break;
+            }
+        }
     } catch (...) {
         SendMessage("start scan error exception...");
     }

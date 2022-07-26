@@ -70,8 +70,9 @@ MainWindow::MainWindow(QWidget *parent)
     QFile file(QCoreApplication::applicationDirPath() + "/setup.txt");
     if (file.open(QIODevice::ReadWrite)) {
         QTextStream in(&file);
-        QString string;
-        while (in.readLineInto(&string)) {
+        QString string, line;
+        while (in.readLineInto(&line)) {
+            string = line;
             if (!string.indexOf("#")
                     || string.isEmpty()) {
                 continue ;
@@ -114,7 +115,7 @@ MainWindow::MainWindow(QWidget *parent)
             else {
                 m_address_list.append(string);
             }
-            qInfo() << string;
+            qInfo() << line;
         }
 
         file.close();
