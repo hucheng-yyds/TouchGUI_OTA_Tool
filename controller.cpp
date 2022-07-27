@@ -6,9 +6,11 @@ Controller::Controller(QObject *parent) : QObject(parent)
 {
     m_thread = new QThread(this);
     m_service = new Service;
-    moveToThread(m_thread);
+    //moveToThread(m_thread);
     m_service->moveToThread(m_thread);
     connect(m_thread, &QThread::finished, m_service, &Service::deleteLater);
+    //connect(m_thread, &QThread::finished, m_thread, &QThread::deleteLater);
+
     connect(this, &Controller::serviceDiscovered, m_service, &Service::ConnectService);
     connect(m_service, &Service::disconnectDevice, this, &Controller::DisconnectDevice);
     connect(m_service, &Service::upgradeResult, this, &Controller::upgradeResult);
@@ -22,14 +24,12 @@ Controller::~Controller()
     m_thread->quit();
     m_thread->wait();
     m_thread = nullptr;
-    //delete m_thread;
-    //delete m_service;
     m_service = nullptr;
     if(m_controller)
     {
         m_controller->disconnectFromDevice();
-//        delete m_controller;
-//        m_controller = nullptr;
+        delete m_controller;
+        m_controller = nullptr;
     }
     SendMessage("~Controller");
 }
@@ -65,7 +65,7 @@ void Controller::ConnectDevice(const QBluetoothDeviceInfo &info, int timeout)
         SendMessage("delete m_controller");
         //delete m_controller;
         //m_controller = NULL;
-        QThread::sleep(1);
+        //QThread::sleep(1);
     }
 
     m_device_info = info;

@@ -372,7 +372,7 @@ void MainWindow::onDeviceDiscovered(const QBluetoothDeviceInfo &info)
         controller->setOTAPoweroff();
         qInfo() << info.address().toString() << "set ota poweroff: true";
     }
-//    controller->ConnectDevice(info);
+    //controller->ConnectDevice(info, m_startTimeout);
     emit ConnectDevice(info, m_startTimeout);
     disconnect(this, &MainWindow::ConnectDevice, controller, &Controller::ConnectDevice);
     int rowCount = ui->tableWidget_2->rowCount();

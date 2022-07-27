@@ -252,7 +252,6 @@ void Service::onCharacteristicChanged(const QLowEnergyCharacteristic &info, cons
                 if (m_file_index >= m_file_data_list.size()) {
                     m_ota_finished = true;
                     emit upgradeResult(true, m_address);
-                    QThread::msleep(100);
 
                     if (m_ota_poweroff)
                     {
