@@ -5,14 +5,13 @@
 #include "service.h"
 #include "device.h"
 #include "httpsclient.h"
+#include "setup.h"
 #include <QFile>
 #include <QDir>
 #include <QFileDialog>
 #include <QMessageBox>
 #include <QKeyEvent>
 #include <QOperatingSystemVersion>
-#include <QTextCodec>
-#include <QCheckbox>
 
 //#define SAMPLE
 MainWindow::MainWindow(QWidget *parent)
@@ -23,22 +22,22 @@ MainWindow::MainWindow(QWidget *parent)
     , m_timer(new QTimer(this))
 {
     ui->setupUi(this);
-    QString qss = ("QPushButton{"                           //Ê≠£Â∏∏Áä∂ÊÄÅÊ†∑Âºè
-                   "background-color:rgb(60, 179, 113);"    //ËÉåÊôØËâ≤Ôºà‰πüÂèØ‰ª•ËÆæÁΩÆÂõæÁâáÔºâ
-                   "border-style:outset;"                   //ËæπÊ°ÜÊ†∑ÂºèÔºàinset/outsetÔºâ
-                   "border-width:4px;"                      //ËæπÊ°ÜÂÆΩÂ∫¶ÂÉèÁ¥†
-                   "border-radius:10px;"                    //ËæπÊ°ÜÂúÜËßíÂçäÂæÑÂÉèÁ¥†
-                   "border-color:rgba(255,255,255,30);"     //ËæπÊ°ÜÈ¢úËâ≤
-                   "font:bold 18px;"                        //Â≠ó‰ΩìÔºåÂ≠ó‰ΩìÂ§ßÂ∞è
-                   "color:rgb(255,255,255);"                //Â≠ó‰ΩìÈ¢úËâ≤
-                   "padding:6px;"                           //Â°´Ë°¨
+    QString qss = ("QPushButton{"                           //’˝≥£◊¥Ã¨—˘ Ω
+                   "background-color:rgb(60, 179, 113);"    //±≥æ∞…´£®“≤ø…“‘…Ë÷√Õº∆¨£©
+                   "border-style:outset;"                   //±ﬂøÚ—˘ Ω£®inset/outset£©
+                   "border-width:4px;"                      //±ﬂøÚøÌ∂»œÒÀÿ
+                   "border-radius:10px;"                    //±ﬂøÚ‘≤Ω«∞Îæ∂œÒÀÿ
+                   "border-color:rgba(255,255,255,30);"     //±ﬂøÚ—’…´
+                   "font:bold 18px;"                        //◊÷ÃÂ£¨◊÷ÃÂ¥Û–°
+                   "color:rgb(255,255,255);"                //◊÷ÃÂ—’…´
+                   "padding:6px;"                           //ÃÓ≥ƒ
                    "}"
-                   "QPushButton:hover{"                     //Èº†Ê†áÊÇ¨ÂÅúÊ†∑Âºè
+                   "QPushButton:hover{"                     // Û±Í–¸Õ£—˘ Ω
                    "background-color:rgb(0,139,0);"
                    "border-color:rgba(255,255,255,200);"
                    "color:rgb(255,255,255);"
                    "}"
-                   "QPushButton:pressed{"                   //Èº†Ê†áÊåâ‰∏ãÊ†∑Âºè
+                   "QPushButton:pressed{"                   // Û±Í∞¥œ¬—˘ Ω
                    "background-color:rgba(100,255,100,200);"
                    "border-color:rgba(255,255,255,30);"
                    "border-style:inset;"
@@ -51,139 +50,30 @@ MainWindow::MainWindow(QWidget *parent)
                    "border-color:rgba(255,255,255,200);""color:rgb(0,139,0);"
                    "}");
     setStyleSheet(qss);
-    setWindowTitle("OTAÂçáÁ∫ßÂ∑•ÂÖ∑" + buildDateTime());
+    setWindowTitle(QString::fromLocal8Bit("OTA…˝º∂π§æﬂ") + buildDateTime());
     ui->tableWidget_2->setColumnWidth(0, 200);
     ui->tableWidget->setColumnHidden(0, true);
 #ifndef SAMPLE
-    qInfo() << "main thread";
+    qInfo() << "main thread" << QThread::idealThreadCount();
+    ui->label_19->setText(setup->m_dirName);
+    ui->label_20->setText(setup->m_version);
+    ui->label_31->setText(setup->m_version);
+    ui->label_38->setText(setup->m_version);
 
-    connect(this, &MainWindow::stopAgentScan, agent, &Agent::stopAgentScan);
-    connect(this, &MainWindow::startAgentScan, agent, &Agent::startAgentScan);
     connect(agent, &Agent::deviceDiscovered, this, &MainWindow::onDeviceDiscovered);
+    connect(agent, &Agent::scanFinished, this, &MainWindow::onScanFinished);
     connect(m_timer, &QTimer::timeout, this, QOverload<>::of(&MainWindow::onUpdateTime));
-
-    //Êú¨Âú∞OTAÔºåÈÄÇÂêàÂ∑•ÂéÇ‰∏≠Êó†ÁΩëÁªúÊÉÖÂÜµ
-    bool ota_local = false;
 
     ui->label_19->installEventFilter(this);
     ui->label_52->installEventFilter(this);
-    QFile file(QCoreApplication::applicationDirPath() + "/setup.txt");
-    if (file.open(QIODevice::ReadWrite)) {
-        QTextStream in(&file);
-        QString string, line;
-        while (in.readLineInto(&line)) {
-            string = line;
-            if (!string.indexOf("#")
-                    || string.isEmpty()) {
-                continue ;
-            } else if (!string.indexOf("dir:")) {
-                string.remove(0, 4);
-                ui->label_19->setText(string);
-            } else if (!string.indexOf("ver:")) {
-                string.remove(0, 4);
-                ui->label_20->setText(string);
-                ui->label_31->setText(string);
-                ui->label_38->setText(string);
-                m_version = string.toUtf8();
-                m_version.resize(12);
-            } else if (!string.indexOf("queue:")){
-                string.remove(0, 6);
-                m_queuemax = string.toInt();
-            } else if (!string.indexOf("loglevel:"))
-            {
-                //main setLogLevel
-            } else if (!string.indexOf("server:"))
-            {
-                string.remove(0, 7);
-                m_httpServer = string.toInt();
-            } else if (!string.indexOf("poweroff:"))
-            {
-                string.remove(0, 9);
-                if (string.toInt()>0)
-                {
-                    m_ota_poweroff = true;
-                }
-            } else if (!string.indexOf("local:"))
-            {
-                string.remove(0, 6);
-                if (string.toInt()>0)
-                {
-                    ota_local = true;
-                    qInfo() << "set ota local:true";
-                }
-            }
-            else {
-                m_address_list.append(string);
-            }
-            qInfo() << line;
-        }
-
-        file.close();
-    }
-
-    //add all fail mac addresses
-    QFile failfile("fail_mac.txt");
-    if (failfile.open(QIODevice::ReadOnly)) {
-        QTextStream in(&failfile);
-        QString string;
-        while (in.readLineInto(&string)) {
-            if (!string.indexOf("#")
-                    || string.isEmpty()) {
-                continue;
-            }
-            m_address_list.append(string);
-            qInfo() << "add fai mac:" << string;
-        }
-        failfile.close();
-    }
-
-    //Ê∑ªÂä†Êâ´ÊèèÊû™ÂΩïÂÖ•ÁöÑmacÂú∞ÂùÄ
-    QFile macfile("mac.txt");
-    if (macfile.open(QIODevice::ReadOnly)) {
-        QTextStream in(&macfile);
-        QString string;
-        while (in.readLineInto(&string)) {
-            if (!string.indexOf("#")
-                    || string.isEmpty()) {
-                continue;
-            }
-            m_address_list.append(string);
-            qInfo() << "add QR gun mac:" << string;
-        }
-        macfile.close();
-    }
-
-    //ÂéªÈáç
-    m_address_list.removeDuplicates();
-
-    //Âà†Èô§‰∏äÊ¨°OTAÊàêÂäüÁöÑmac
-    QFile succfile("success_mac.txt");
-    if (succfile.open(QIODevice::ReadOnly)) {
-        QTextStream in(&succfile);
-        QString string;
-        while (in.readLineInto(&string)) {
-            if (!string.indexOf("#")
-                    || string.isEmpty()) {
-                continue;
-            }
-            m_address_list.removeOne(string);
-            qInfo() << "delete succ mac:" << string;
-        }
-        succfile.close();
-    }
-//    QFile mfile("success_mac.txt");
-//    mfile.open(QIODevice::ReadWrite | QIODevice::Truncate);
-//    mfile.close();
-
     GetDirectoryFile(ui->label_19->text());
 #else
     device = new Device;
 #endif
-
     //init vcode
-    https->setServerIndex(m_httpServer);
-    if (!ota_local)
+    if (!setup->m_ota_local)
     {
+        ui->tabWidget->setCurrentIndex(0);
         refreshVCode();
     }
 
@@ -191,16 +81,17 @@ MainWindow::MainWindow(QWidget *parent)
     auto cur_system = QOperatingSystemVersion::current();
     if (cur_system > QOperatingSystemVersion::Windows10)
     {
-        m_startTimeout = 60;
+        setup->m_startTimeout = 60;
     }
 
     qInfo() << "current operating system version:" << cur_system;
-    qInfo() << "set controller start timeout:" << m_startTimeout << "secs";
+    qInfo() << "set controller start timeout:" << setup->m_startTimeout << "secs";
 }
 
 MainWindow::~MainWindow()
 {
-    //on_pushButton_6_clicked();
+    delete setup;
+    on_pushButton_6_clicked();
     delete ui;
     delete https;
     delete m_timer;
@@ -213,27 +104,23 @@ void MainWindow::GetDirectoryFile(const QString &srcDirName)
     if(srcDirName.isEmpty()) {
         return ;
     }
-//    QTextCodec * codec = QTextCodec::codecForName("gbk");
-//    QString dirName = codec->fromUnicode(srcDirName);
-//    qDebug() << "codecForName GB2312:" << srcDirName;
-//    qDebug() << "codecForName result:" << dirName;
 
     QDir dir(srcDirName);
-    ui->label_19->setText(QDir::current().relativeFilePath(srcDirName));//ÊòæÁ§∫Áõ∏ÂØπË∑ØÂæÑ
+    ui->label_19->setText(QDir::current().relativeFilePath(srcDirName));//œ‘ æœ‡∂‘¬∑æ∂
     ui->label_30->setText(ui->label_19->text());
     ui->label_39->setText(ui->label_19->text());
     QStringList nameFilters("*.bin");
     QStringList files = dir.entryList(nameFilters, QDir::Files|QDir::Readable, QDir::Name);
-    m_total_file_size = 0;
-    m_file_name_list.clear();
-    m_file_data_list.clear();
+    setup->m_total_file_size = 0;
+    setup->m_file_name_list.clear();
+    setup->m_file_data_list.clear();
     foreach(QString name, files) {
         QFile file(dir.absoluteFilePath(name));
         qInfo() << "file name:" << file.fileName();
-        m_total_file_size += file.size();
+        setup->m_total_file_size += file.size();
         if (file.open(QIODevice::ReadOnly)) {
-            m_file_name_list.append(name.toUtf8());
-            m_file_data_list.append(file.readAll());
+            setup->m_file_name_list.append(name.toUtf8());
+            setup->m_file_data_list.append(file.readAll());
             file.close();
         } else {
             qWarning() << "file cannot open";
@@ -246,14 +133,14 @@ QString MainWindow::buildDateTime() const
     QString dateTime;
     dateTime += __DATE__;
     dateTime += __TIME__;
-    dateTime.replace("  "," 0");//Ê≥®ÊÑèÊòØ‰∏§‰∏™Á©∫Ê†ºÔºåÁî®‰∫éÊó•Êúü‰∏∫ÂçïÊï∞Êó∂ÈúÄË¶ÅËΩ¨Êàê‚ÄúÁ©∫Ê†º+0‚Äù
+    dateTime.replace("  "," 0");//◊¢“‚ «¡Ω∏ˆø’∏Ò£¨”√”⁄»’∆⁄Œ™µ• ˝ ±–Ë“™◊™≥…°∞ø’∏Ò+0°±
     return QLocale(QLocale::English).toDateTime(dateTime, "MMM dd yyyyhh:mm:ss").toString(" yyyy.MM.dd");
 }
 
 void MainWindow::refreshVCode()
 {
     if (https->verificationCode() < 0) {
-        QMessageBox::information(this, "ÊèêÁ§∫", "È™åËØÅÁ†ÅËé∑Âèñfail", QMessageBox::NoButton);
+        QMessageBox::information(this, "Tips", QString::fromLocal8Bit("—È÷§¬ÎªÒ»° ß∞‹"));
     }
     else
     {
@@ -311,19 +198,12 @@ void MainWindow::keyPressEvent(QKeyEvent *keyValue)
                 continue;
             }
             qDebug() << macStr;
-            m_address_list << macStr;
+            setup->m_address_list << macStr;
         }
-        m_address_list.removeDuplicates();
-        m_targetcount = m_address_list.size();
+        setup->m_address_list.removeDuplicates();
+        m_targetcount = setup->m_address_list.size();
         ui->lineEdit_4->setText(QString::number(m_targetcount));
-        QFile file("mac.txt");
-        file.open(QIODevice::WriteOnly);
-        QTextStream out(&file);
-        for (auto & m : m_address_list)
-        {
-            out << m << '\n';
-        }
-        file.close();
+        setup->writeMac();
         m_barStr.clear();
     }
     else {
@@ -343,89 +223,93 @@ void MainWindow::onDeviceDiscovered(const QBluetoothDeviceInfo &info)
         qInfo() << info.address().toString() << "has already finished";
         return ;
     }
-    int current_queue = controller_list.size();
-    if (current_queue >= m_queuemax) {
-        qInfo() << info.address().toString() << "can not connect"
-                 << "wait for idle, controller queue:" << controller_list.size();
-        emit stopAgentScan();
-        return ;
-    }
-    else if ((m_queuemax-current_queue) == 1)
-    {
-        emit stopAgentScan();
-    }
-
-    Controller *controller = new Controller;
+    Controller *controller = new Controller(info);
     connect(controller, &Controller::upgradeResult, this, &MainWindow::onUpgradeResult);
-    connect(this, &MainWindow::ConnectDevice, controller, &Controller::ConnectDevice);
-//    controller->start();
     controller_list.append(controller);
-    controller->SetProperty(m_file_data_list, m_file_name_list, m_total_file_size, m_version);
+    if (controller_list.size() >= setup->m_queuemax) {
+        agent->stopScan();
+    } else if (m_targetcount - m_successcount - m_failcount == controller_list.size()) {
+        agent->stopScan();
+    }
+}
 
+void MainWindow::onScanFinished(bool isTimeout)
+{
     if (ui->checkBox->checkState() == Qt::CheckState::Checked)
     {
-        controller->setIgnoreVersionCompare();
-        qInfo() << info.address().toString() << "set ignore version compare: true";
+        setup->m_ignore_version_compare = true;
+        qInfo() << "set ignore version compare: true";
     }
-    if (m_ota_poweroff)
+    if (setup->m_ota_poweroff)
     {
-        controller->setOTAPoweroff();
-        qInfo() << info.address().toString() << "set ota poweroff: true";
+        qInfo() << "set ota poweroff: true";
     }
-    //controller->ConnectDevice(info, m_startTimeout);
-    emit ConnectDevice(info, m_startTimeout);
-    disconnect(this, &MainWindow::ConnectDevice, controller, &Controller::ConnectDevice);
-    int rowCount = ui->tableWidget_2->rowCount();
-    ui->tableWidget_2->insertRow(rowCount);//Ê∑ªÂä†Âà∞Ê≠£Âú®ÂçáÁ∫ßÂàóË°®
-    ui->tableWidget_2->setItem(rowCount, 0, new QTableWidgetItem(info.address().toString()));
-    agent->setProcessingCount(controller_list.size());
+    if (isTimeout) {
+        if (ui->lineEdit_5->text().isEmpty()) {
+            for (const auto &address : qAsConst(setup->m_address_list)) {
+                if (!setup->m_fail_address_list.contains(address)
+                        && !setup->m_success_address_list.contains(address)) {
+                    bool find = false;
+                    for (const auto &con : qAsConst(controller_list)) {
+                        if (con->address() == address) {
+                            find = true;
+                            break;
+                        }
+                    }
+                    if (!find) {
+                        setup->m_fail_address_list << address;
+                        m_failcount ++;
+                    }
+                }
+            }
+        } else {
+            m_failcount = m_targetcount - m_successcount - controller_list.size();
+        }
+    }
+    while (!controller_list.isEmpty()) {
+        qInfo() << "m_processingcount:" << m_processingcount << "setup->m_queuemax:" << setup->m_queuemax;
+        addProgressList(controller_list.takeFirst());
+    }
+    checkScan();
 }
 
 void MainWindow::onUpgradeResult(bool success, const QString &address)
 {
     QList<QTableWidgetItem*> list = ui->tableWidget_2->findItems(address, Qt::MatchFixedString);
-    if (!list.isEmpty()) {//Âçï‰∏™ÂçáÁ∫ßÂÆåÊàê
+    if (!list.isEmpty()) {//µ•∏ˆ…˝º∂ÕÍ≥…
         int index = ui->tableWidget_2->row(list[0]);
         if (-1 == index) {
             qWarning() << "do not find device:" << address;
             return;
         }
-        ui->tableWidget_2->removeRow(index);//‰ªéÊ≠£Âú®ÂçáÁ∫ßÂàóË°®ÁßªÈô§
         qInfo() << address << "upgrade result:" << success
                 << "row index:" << index;
-        delete controller_list[index];
-        controller_list.removeAt(index);
-        agent->setProcessingCount(controller_list.size());
         if (success) {
-            ui->listWidget->addItem(address);//Ê∑ªÂä†Âà∞ÂçáÁ∫ßÊàêÂäüÂàóË°®
+            ui->listWidget->addItem(address);//ÃÌº”µΩ…˝º∂≥…π¶¡–±Ì
             ui->label_33->setText(QString::number(ui->listWidget->count()));
             m_successcount++;
-            agent->increaseSuccessCount(address);
-            QFile file("success_mac.txt");
-            if (file.open(QIODevice::ReadWrite|QIODevice::Append))
-            {
-                QTextStream out(&file);
-                out << address << '\n';
-                file.flush();
-                file.close();
-            }
+            setup->m_success_address_list << address;
+            delete controller_progress_list[index];
         }
         else
         {
-            m_failcount++;
-            agent->increaseFailCount(address);
-            QFile file("fail_mac.txt");
-            if (file.open(QIODevice::Append))
-            {
-                QTextStream out(&file);
-                out << address << '\n';
-                file.flush();
-                file.close();
+            if (controller_progress_list[index]->connectCount() < 0) {
+                m_failcount++;
+                setup->m_fail_address_list << address;
+                delete controller_progress_list[index];
+            } else {
+                controller_list << controller_progress_list[index];
             }
-            m_fail_address_list.append(address);
         }
+        controller_progress_list.removeAt(index);
+        ui->tableWidget_2->removeRow(index);//¥”’˝‘⁄…˝º∂¡–±Ì“∆≥˝
+        m_processingcount --;
         checkScan();
-        qInfo() << "processing_count:" << controller_list.size()
+//        for (int i = 0; i < controller_progress_list.size(); i ++) {
+//            qInfo() << "p_list index:" << i
+//                    << "p_con address:" << controller_progress_list.at(i)->address();
+//        }
+        qInfo() << "processing_count:" << m_processingcount
                 << "success_count:" << m_successcount
                 << "fail_count:" << m_failcount
                 << "target_count:" << m_targetcount;
@@ -445,104 +329,82 @@ void MainWindow::onUpdateTime()
 
 void MainWindow::checkScan()
 {
-    int processing_count = controller_list.size();
     if (agent->isFindCountEnough()
-            && ((processing_count+m_successcount+m_failcount)<m_targetcount))
-    {
-        emit startAgentScan();
-    }
-    if (processing_count > 0)
-    {
-        return;
-    }
-    if (((m_successcount+m_failcount) >= m_targetcount)
-            || !agent->isFindCountEnough()) {//ÂÖ®ÈÉ®ÂçáÁ∫ßÂÆåÊàê
+            && !controller_list.isEmpty()) {
+        addProgressList(controller_list.takeFirst());
+    } else if (m_processingcount == 0) {//»´≤ø…˝º∂ÕÍ≥…
+        if (m_successcount + m_failcount < m_targetcount) {
+            agent->startScan();
+            return ;
+        }
         m_timer->stop();
-        emit stopAgentScan();
+        agent->stopScan();
         ui->tabWidget->setCurrentIndex(5);
-        ui->label_46->setText(QString::number(ui->listWidget->count()));//Â∑≤ÂÆåÊàêÊï∞
-        ui->label_49->setText(ui->label_34->text());//ÊÄªËÄóÊó∂
-        ui->label_47->setText(QString::number(m_targetcount-m_successcount));//Êú™ÂÆåÊàêÊï∞
+        ui->label_46->setText(QString::number(ui->listWidget->count()));//“—ÕÍ≥… ˝
+        ui->label_49->setText(ui->label_34->text());//◊‹∫ƒ ±
+        ui->label_47->setText(QString::number(m_targetcount - m_successcount));//Œ¥ÕÍ≥… ˝
         double hourCount = ui->listWidget->count() / (m_elapsed_second / 3600.00);
         qInfo() << "hourCount:" << hourCount << m_elapsed_second << ui->listWidget->count();
-        ui->label_48->setText(QString::number(hourCount, 'f', 0)+" units/hour");//Âπ≥ÂùáÈÄüÂ∫¶
+        ui->label_48->setText(QString::number(hourCount, 'f', 0)+" units/hour");//∆Ωæ˘ÀŸ∂»
         ui->pushButton_4->setEnabled(true);
-
-        saveFailMacAddress();
     }
 }
 
-void MainWindow::saveFailMacAddress()
+void MainWindow::addProgressList(Controller *controller)
 {
-    if (m_fail_address_list.isEmpty())
-    {
-        return;
-    }
-    //overwrite fail mac addresses
-    QFile file("fail_mac.txt");
-    if (file.open(QIODevice::ReadWrite | QIODevice::Truncate))
-    {
-        QTextStream out(&file);
-        for (auto & address : m_fail_address_list)
-        {
-            out << address << '\n';
-            qInfo() << "overwrite fail mac:" << address;
-        }
-        file.flush();
-        file.close();
-    }
+    int rowCount = ui->tableWidget_2->rowCount();
+    ui->tableWidget_2->insertRow(rowCount);//ÃÌº”µΩ’˝‘⁄…˝º∂¡–±Ì
+    ui->tableWidget_2->setItem(rowCount, 0, new QTableWidgetItem(controller->address()));
+    controller->ConnectDevice(setup->m_startTimeout);
+    controller_progress_list << controller;
+    m_processingcount ++;
 }
 
-//OTAÂºÄÂßãÂçáÁ∫ß
+//OTAø™ º…˝º∂
 void MainWindow::on_pushButton_4_clicked()
 {
 #ifndef SAMPLE
 //    agent->startScanDevice(10000, (QStringList()<<"3D:D8"<<"3F:E1"<<"57:E7"<<"6E:E9"<<"40:E8"));
-    if (0 == m_total_file_size) {
-        QMessageBox::information(this, "ÊèêÁ§∫", "ËØ∑Ê£ÄÊü•ÂçáÁ∫ßÂåÖ!", QMessageBox::NoButton);
+    if (0 == setup->m_total_file_size) {
+        QMessageBox::information(this, "Tips", QString::fromLocal8Bit("«ÎºÏ≤È…˝º∂∞¸!"));
         return ;
     }
     if (ui->label_20->text().isEmpty()) {
-        if (QMessageBox::question(this, "ÊèêÁ§∫", "ÁâàÊú¨Âè∑‰∏∫Á©∫ÔºåÁ°ÆÂÆöË¶ÅÂçáÁ∫ßÂêó?")
+        if (QMessageBox::question(this, "Ask", QString::fromLocal8Bit("∞Ê±æ∫≈Œ™ø’£¨»∑∂®“™…˝º∂¬?"))
                 == QMessageBox::No) {
             return ;
         }
     }
-    if (m_targetcount == 0)
-    {
+    if (!ui->lineEdit_5->text().isEmpty() &&
+            ui->lineEdit_4->text().toInt()) {
         m_targetcount = ui->lineEdit_4->text().toInt();
-    }
-    if (m_targetcount < 1)
-    {
-        m_targetcount = m_address_list.size();
+    } else {
+        m_targetcount = setup->m_address_list.size();
     }
     qInfo() << "Target count:" << m_targetcount;
     if (m_targetcount < 1)
     {
-        QMessageBox::information(this, "ÊèêÁ§∫", "ËØ∑Á°ÆËÆ§ÁõÆÊ†áÊï∞", QMessageBox::NoButton);
+        QMessageBox::information(this, "Tips", QString::fromLocal8Bit("«Î»∑»œƒø±Í ˝"));
         return ;
     }
 
-    //Â¶ÇÊûúÁõÆÊ†áÊï∞Â∞è‰∫éÊúÄÂ§ßÈòüÂàóÊï∞
-    if (m_targetcount < m_queuemax)
+    //»Áπ˚ƒø±Í ˝–°”⁄◊Ó¥Û∂”¡– ˝
+    if (m_targetcount < setup->m_queuemax)
     {
-        m_queuemax = m_targetcount;
-        qInfo() << "reset queue max:" << m_queuemax;
+        setup->m_queuemax = m_targetcount;
+        qInfo() << "reset queue max:" << setup->m_queuemax;
     }
     m_successcount = 0;
     m_failcount = 0;
 
-    agent->setTargetCount(m_targetcount);
     agent->setMatchStr(ui->lineEdit_5->text());
     ui->label_32->setText(QString::number(m_targetcount));
-    ui->label_40->setText(QString::number(m_targetcount));//ÁõÆÊ†áÊÄªÊï∞
+    ui->label_40->setText(QString::number(m_targetcount));//ƒø±Í◊‹ ˝
     ui->tabWidget->setCurrentIndex(4);
     m_timer->start(1000);
     ui->pushButton_4->setEnabled(false);
 
-    agent->initScanData(m_scanTimeout * 1000, m_address_list);
-    agent->setQueueMax(m_queuemax);
-    emit startAgentScan();
+    agent->startScan();
 #else
     device->startDeviceDiscovery();
 #endif
@@ -553,7 +415,7 @@ void MainWindow::on_pushButton_3_clicked()
 
 }
 
-//OTAÁªìÊùü
+//OTAΩ· ¯
 void MainWindow::on_pushButton_6_clicked()
 {
 #ifndef SAMPLE
@@ -562,8 +424,7 @@ void MainWindow::on_pushButton_6_clicked()
     ui->tableWidget_2->setRowCount(0);
     ui->listWidget->clear();
     m_timer->stop();
-    emit stopAgentScan();
-    agent->resetData();
+    agent->cancelScan();
     qDeleteAll(controller_list);
     controller_list.clear();
     ui->pushButton_4->setEnabled(true);
@@ -573,7 +434,7 @@ void MainWindow::on_pushButton_6_clicked()
 }
 
 
-//Ë¥¶Âè∑ÁôªÂΩï
+//’À∫≈µ«¬º
 void MainWindow::on_pushButton_clicked()
 {
     if (ui->lineEdit->text().isEmpty() || ui->lineEdit_2->text().isEmpty()) {
@@ -581,14 +442,15 @@ void MainWindow::on_pushButton_clicked()
     }
     int ret = https->login(ui->lineEdit->text(), ui->lineEdit_2->text(), ui->lineEdit_3->text());
     if (ret < 0) {
-        QMessageBox::information(this, "ÊèêÁ§∫", "ÁôªÂΩïÂ§±Ë¥•", QMessageBox::NoButton);
+        QMessageBox::information(this, "Tips", QString::fromLocal8Bit("µ«¬º ß∞‹"));
         refreshVCode();
         return ;
     }
     QList<QStringList> stringList;
     ret = https->upgradePackageList(stringList);
     if (ret < 0) {
-        QMessageBox::question(this, "ÊèêÁ§∫", "Ëé∑ÂèñÂàóË°®Â§±Ë¥•", QMessageBox::Retry | QMessageBox::Cancel);
+        QMessageBox::question(this, "Ask", QString::fromLocal8Bit("ªÒ»°¡–±Ì ß∞‹"),
+                              QMessageBox::Retry | QMessageBox::Cancel);
         return;
     }
 
@@ -628,7 +490,7 @@ void MainWindow::on_pushButton_2_clicked()
         QString dirname;
         if (https->downloadPackage(custOtaId, dirname) < 0) {
             qWarning() << "download fail:";
-            QMessageBox::information(this, "ÊèêÁ§∫", "‰∏ãËΩΩÂ§±Ë¥•", QMessageBox::NoButton);
+            QMessageBox::information(this, "Tips", QString::fromLocal8Bit("œ¬‘ÿ ß∞‹"));
             return ;
         }
         qDebug() << "download successfully:" << dirname;
@@ -637,8 +499,8 @@ void MainWindow::on_pushButton_2_clicked()
         ui->label_20->setText(version);
         ui->label_31->setText(version);
         ui->label_38->setText(version);
-        m_version = version.toUtf8();
-        m_version.resize(12);
+        setup->m_version = version.toUtf8();
+        setup->m_version.resize(12);
     }
 }
 

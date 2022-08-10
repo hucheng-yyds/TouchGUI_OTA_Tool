@@ -1,103 +1,64 @@
 #include "agent.h"
+#include "setup.h"
 #include <QDebug>
 
 Agent::Agent(QObject *parent) : QObject(parent)
 {
-    m_agent = new QBluetoothDeviceDiscoveryAgent();
+    m_agent = new QBluetoothDeviceDiscoveryAgent(this);
+    m_agent->setLowEnergyDiscoveryTimeout(setup->m_scanTimeout * 1000);
+//    m_agent->setLowEnergyDiscoveryTimeout(0);
     m_timer = new QTimer(this);
-    connect(m_timer, &QTimer::timeout, this, &Agent::onStartAgentScan);
+    m_timer->setInterval(setup->m_scanTimeout * 1000);
+    m_timer->setSingleShot(true);
+    connect(m_timer, &QTimer::timeout, m_agent, &QBluetoothDeviceDiscoveryAgent::stop);
     connect(m_agent, SIGNAL(deviceDiscovered(QBluetoothDeviceInfo)), this, SLOT(onDeviceDiscovered(QBluetoothDeviceInfo)));
     connect(m_agent, SIGNAL(error(QBluetoothDeviceDiscoveryAgent::Error)), this, SLOT(onError(QBluetoothDeviceDiscoveryAgent::Error)));
     connect(m_agent, SIGNAL(finished()), this, SLOT(onFinished()));
     connect(m_agent, SIGNAL(canceled()), this, SLOT(onCanceled()));
-
-    connect(this, &Agent::startAgentScan, this, &Agent::onStartAgentScan);
-    connect(this, &Agent::stopAgentScan, this, &Agent::onStopAgentScan);
-    connect(this, &Agent::beginTimer, this, &Agent::onBeginTimer);
 }
 
-Agent::~Agent()
+bool Agent::isActive()
 {
-    stopScan();
-    delete m_agent;
-    delete m_timer;
-    m_agent = nullptr;
-    m_timer = nullptr;
+    return m_timer->isActive() || m_agent->isActive();
 }
 
-void Agent::resetData()
+void Agent::setMatchStr(const QString &matchStr)
 {
-    m_find_count = 0;
-    m_not_find = true;
-
-    m_targetcount = 0;
-    m_successcount = 0;
-    m_processingcount = 0;
+    m_match_str = matchStr;
+}
+//Ã»ÓĞÕÒµ½Ò»¸öÉè±¸ËãÒ»´ÎÏûºÄ£¬ÕÒµ½Éè±¸ÏûºÄÖØÖÃÎª0
+bool Agent::isFindCountEnough() const
+{
+    return m_find_count < 6;
 }
 
-void Agent::initScanData(int msTimeout, const QStringList &address)
+void Agent::startScan()
 {
-    m_address_list = address;
-    m_agent->setLowEnergyDiscoveryTimeout(msTimeout);
-}
-
-void Agent::onStartAgentScan()
-{
-    stopTimer();
-    stopScan();
+    m_cancel = false;
     try {
+        qDebug("scan started...");
         m_agent->start(QBluetoothDeviceDiscoveryAgent::LowEnergyMethod);
-        SendMessage("scan started...");
+//        startTimer();
+        //Ö±Á¬ÎÊÌâ¶à£¡controllerÎö¹¹ÎŞ·¨Õı³£µ÷ÓÃ
+//        int i = setup->m_queuemax - setup->m_processingcount;
+//        for (const auto &string : qAsConst(setup->m_address_list)) {
+//            QBluetoothAddress mac(string);
+//            if (mac.isNull()) {
+//                continue ;
+//            }
 
-        //ç›´è¿é—®é¢˜å¤šï¼controllerææ„æ— æ³•æ­£å¸¸è°ƒç”¨
-        int i = m_queuemax - m_processingcount;
-        QStringList address = m_address_list;
-        for (const auto &string : address) {
-            QBluetoothAddress mac(string);
-            if (mac.isNull()) {
-                continue ;
-            }
-
-            if (i > 0) {
-                const QBluetoothDeviceInfo info(mac, "", 0);
-                emit deviceDiscovered(info);
-                i--;
-            }
-            else
-            {
-                break;
-            }
-        }
+//            if (i > 0) {
+//                const QBluetoothDeviceInfo info(mac, "", 0);
+//                emit deviceDiscovered(info);
+//                i--;
+//            }
+//            else
+//            {
+//                break;
+//            }
+//        }
     } catch (...) {
-        SendMessage("start scan error exception...");
-    }
-}
-
-void Agent::onStopAgentScan()
-{
-    stopScan();
-}
-
-void Agent::onBeginTimer()
-{
-    startTimer();
-}
-
-void Agent::startTimer()
-{
-    if (!m_timer->isActive())
-    {
-        m_timer->start(30*1000);
-        SendMessage("scan timer started...");
-    }
-}
-
-void Agent::stopTimer()
-{
-    if (m_timer->isActive())
-    {
-        m_timer->stop();
-        SendMessage("scan timer stopped...");
+        qDebug("start scan error exception...");
     }
 }
 
@@ -106,57 +67,57 @@ void Agent::stopScan()
     if (m_agent->isActive())
     {
         m_agent->stop();
-        SendMessage("scan stopped...");
+        qDebug("scan stopped...");
+    }
+    stopTimer();
+}
+
+void Agent::cancelScan()
+{
+    m_cancel = true;
+    stopScan();
+}
+
+void Agent::startTimer()
+{
+    if (!m_timer->isActive())
+    {
+        m_timer->start();
+        qDebug("scan timer started...");
     }
 }
 
-bool Agent::isActive()
+void Agent::stopTimer()
 {
-    return
-            m_timer->isActive() ||
-            m_agent->isActive();
+    if (m_timer->isActive())
+    {
+        m_timer->stop();
+        qDebug("scan timer stopped...");
+    }
 }
 
-void Agent::setMatchStr(const QString &matchStr)
+void Agent::resetData()
 {
-    m_match_str = matchStr;
-}
-
-void Agent::SendMessage(const QString &msg)
-{
-    qInfo() << "Agent" << msg;
+    m_find_count = 0;
+    m_not_find = true;
 }
 
 void Agent::onDeviceDiscovered(const QBluetoothDeviceInfo &info)
 {
-    if (!info.isValid())
-    {
-        return;
-    }
     if (m_match_str.isEmpty()) {
-        bool find = false;
-        //m_address_mutex.lock();
-        if (!m_address_list.filter(
-                    info.address().toString()
-                    ,Qt::CaseInsensitive).isEmpty()) {
-            find = true;
+        if (!setup->m_address_list.contains(info.address().toString(), Qt::CaseInsensitive)) {
+            return ;
         }
-        //m_address_mutex.unlock();
-        if (!find)
-        {
-            return;
-        }
-
     } else {
         if (-1 == info.name().indexOf(m_match_str)) {
             return ;
         }
     }
-    emit deviceDiscovered(info);
     m_not_find = false;
-    QString tmp = "å‘ç°è®¾å¤‡:";
+    QString tmp = QString::fromLocal8Bit("·¢ÏÖÉè±¸:");
     QString str = info.address().toString() + " - " + info.name() + " rssi:" + QString::number(info.rssi());
-    SendMessage(tmp + str);
+    qInfo() << tmp << str;
+    emit deviceDiscovered(info);
 }
 
 void Agent::onError(QBluetoothDeviceDiscoveryAgent::Error err)
@@ -166,47 +127,34 @@ void Agent::onError(QBluetoothDeviceDiscoveryAgent::Error err)
     str = QString("Error(%1):").arg(err);
     str += m_agent->errorString();
 
-    qWarning() << "Agent" << str;
+    qWarning() << str;
 }
 
-//è§¦å‘finishedä¿¡å· ä¼šå¯¼è‡´ç¨‹åºcrash 2022-7-20 æœªè§£å†³
+//´¥·¢finishedĞÅºÅ »áµ¼ÖÂ³ÌĞòcrash 2022-7-20 Î´½â¾ö
 void Agent::onFinished()
 {
+    qInfo() << "scan finished";
+    emit scanFinished(true);
+}
+
+void Agent::onCanceled()
+{
+    if (m_cancel) {
+        return ;
+    }
     if (m_not_find) {
         m_find_count ++;
     } else {
         m_find_count = 0;
     }
-    m_not_find = true; 
+    m_not_find = true;
 
-    if (isFindCountEnough()
-            && ((m_processingcount+m_successcount+m_failcount)<m_targetcount))
-    {
-        startTimer();
-    }
-    else
-    {
-        stopTimer();
-    }
-    qInfo() << "processing_count:" << m_processingcount
-            << "success_count:" << m_successcount
-            << "fail_count:" << m_failcount
-            << "target_count:" << m_targetcount;
-}
-
-void Agent::onCanceled()
-{
-    SendMessage("scan canceled");
-}
-
-void Agent::increaseSuccessCount(const QString & address)
-{
-    m_address_list.removeOne(address);
-    m_successcount++;
-}
-
-void Agent::increaseFailCount(const QString & address)
-{
-    m_address_list.removeOne(address);
-    m_failcount++;
+//    const QList<QBluetoothDeviceInfo> foundDevices = m_agent->discoveredDevices();
+//    for (const auto &nextDevice : foundDevices) {
+//        if (setup->m_address_list.contains(nextDevice.address().toString(), Qt::CaseInsensitive)) {
+//            emit deviceDiscovered(nextDevice);
+//        }
+//    }
+    qInfo("scan canceled");
+    emit scanFinished(false);
 }

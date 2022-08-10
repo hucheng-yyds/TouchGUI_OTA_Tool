@@ -33,6 +33,7 @@ protected:
 
 private slots:
     void onDeviceDiscovered(const QBluetoothDeviceInfo &info);
+    void onScanFinished(bool isTimeout);
     void onUpgradeResult(bool success, const QString &address);
     void onUpdateTime();
 
@@ -45,47 +46,25 @@ private slots:
     void on_pushButton_2_clicked();
 
 signals:
-    void ConnectDevice(const QBluetoothDeviceInfo &info, int timeout);
-    void stopAgentScan();
-    void startAgentScan();
+    void ConnectDevice(int timeout);
 
 private:
     void checkScan();
     void refreshVCode();
-    void saveFailMacAddress();
+    void addProgressList(Controller *controller);
 
 private:
     Ui::MainWindow *ui;
     Agent *agent;
     HttpsClient *https;
     QList<Controller *> controller_list;
-    QByteArrayList m_file_data_list;
-    QByteArrayList m_file_name_list;
-    int m_total_file_size = 0;
-    QByteArray m_version;
+    QList<Controller *> controller_progress_list;
     QTimer *m_timer;
-    int m_elapsed_second = 0;
-    QStringList m_address_list;
     QString m_barStr;
-
+    int m_elapsed_second = 0;
     int m_targetcount = 0;
     int m_successcount = 0;
     int m_failcount = 0;
-    int m_queuemax = 2;
-
-    //controller start time out, seconds
-    int m_startTimeout = 30;
-
-    //agent scan timeout
-    int m_scanTimeout = 1200;
-
-    //http服务环境配置
-    //0-测试环境， 1-正式环境
-    int m_httpServer = 1;
-
-    //ota结束后是否关机
-    bool m_ota_poweroff = false;
-
-    QStringList m_fail_address_list;
+    int m_processingcount = 0;
 };
 #endif // MAINWINDOW_H

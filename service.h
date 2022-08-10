@@ -5,7 +5,6 @@
 #include <QLowEnergyService>
 #include <QEventLoop>
 #include <QThread>
-#include <QPointer>
 
 #define CMD_HEAD_PARAM      (uchar)0x02
 #define PARAM_GET_INFO      (uchar)0x01
@@ -39,18 +38,13 @@ public:
     explicit Service(QObject *parent = nullptr);
     ~Service();
 
-    void SetProperty(QByteArrayList &data, QByteArrayList &name, int size, QByteArray &version);
     void ConnectService(QLowEnergyService *, const QString &address);
-    void SendMessage(const QString &);
     void OpenNotify(QLowEnergyCharacteristic ch, bool flag);
     void ReadCharacteristic(QLowEnergyCharacteristic ch);
     void WriteCharacteristic(QLowEnergyCharacteristic ch, const QByteArray &arr);
 
     uchar getFileType(int index);
     uint32_t CheckSum(uint8_t *pBuffer, uint8_t len);
-
-    void setIgnoreVersionCompare(){m_ignore_version_compare=true;}
-    void setOTAPoweroff() {m_ota_poweroff=true;}
 
 public:
     enum ResultState {
@@ -75,7 +69,6 @@ private slots:
     void onError(QLowEnergyService::ServiceError error);
 
 signals:
-    void message(QString);
     void discoveryCharacteristic(QLowEnergyCharacteristic);
     void disconnectDevice();
     void upgradeResult(bool success, const QString &address);
@@ -90,15 +83,9 @@ private:
     bool WaitOTABodyReply(int secTimeout);
     int CompareVersion(const QByteArray &version1, const QByteArray &version2);
 
-    //QLowEnergyService * m_service = nullptr;
-    QPointer<QLowEnergyService> m_service;
+    QLowEnergyService *m_service = nullptr;
     QLowEnergyCharacteristic m_characteristics;
     QString m_address;
-
-    QByteArrayList m_file_data_list;
-    QByteArrayList m_file_name_list;
-    int m_total_file_size = 0;
-    QByteArray m_version;
 
     bool m_last_pack = false;
     bool m_set_offset = false;
@@ -111,11 +98,6 @@ private:
     int m_check_sum = 0;
     int m_cur_sum = 0;
     bool m_ota_finished = false;
-
-    bool m_ignore_version_compare = false;
-
-    //ota结束后是否关机
-    bool m_ota_poweroff = false;
 
     QByteArray m_oy22b_tpversion;
 };

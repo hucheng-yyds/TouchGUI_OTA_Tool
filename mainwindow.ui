@@ -88,7 +88,7 @@
            </font>
           </property>
           <property name="text">
-           <string>cloud</string>
+           <string>JackHu</string>
           </property>
          </widget>
         </item>
@@ -120,7 +120,7 @@
            </font>
           </property>
           <property name="text">
-           <string>123456</string>
+           <string>jack123456</string>
           </property>
           <property name="echoMode">
            <enum>QLineEdit::Password</enum>
@@ -731,11 +731,11 @@
            </item>
            <item row="4" column="1">
             <widget class="QCheckBox" name="checkBox">
-             <property name="maximumSize">
-              <size>
-               <width>16777215</width>
-               <height>24</height>
-              </size>
+             <property name="font">
+              <font>
+               <family>Microsoft YaHei UI</family>
+               <pointsize>15</pointsize>
+              </font>
              </property>
              <property name="text">
               <string>是</string>
@@ -1269,7 +1269,7 @@
      <x>0</x>
      <y>0</y>
      <width>817</width>
-     <height>26</height>
+     <height>25</height>
     </rect>
    </property>
    <widget class="QMenu" name="menuTouchGUI">

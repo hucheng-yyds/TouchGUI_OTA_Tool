@@ -10,20 +10,21 @@ class Controller : public QObject
 {
     Q_OBJECT
 public:
-    explicit Controller(QObject *parent = nullptr);
+    explicit Controller(const QBluetoothDeviceInfo &info);
     ~Controller();
 
-    void SetProperty(QByteArrayList &data, QByteArrayList &name, int size, QByteArray &version);
-    void ConnectDevice(const QBluetoothDeviceInfo &info, int timeout);
+    void ConnectDevice(int timeout);
     void DisconnectDevice(void);
-
-    QLowEnergyService *CreateService(QBluetoothUuid);
-
-    void setIgnoreVersionCompare();
-    void setOTAPoweroff();
-
-private:
-    void SendMessage(const QString &);
+    QLowEnergyService *CreateService(const QBluetoothUuid &uuid);
+    int connectCount() const {
+        return m_connect_count;
+    }
+    QBluetoothDeviceInfo device() const {
+        return m_device;
+    }
+    QString address() const {
+        return m_device.address().toString();
+    }
 
 private slots:
     void onConnected();
@@ -31,35 +32,25 @@ private slots:
     void onStateChanged(QLowEnergyController::ControllerState state);
     void onError(QLowEnergyController::Error newError);
 
+    void onConnectToDevice(int timeout);
     void onServiceDiscovered(QBluetoothUuid);
     void onDiscoveryFinished();
     void onConnectionUpdated(const QLowEnergyConnectionParameters &parameters);
-    void onReconnectDevice();
     void onStartOTA();
     void onStartOTATimeout();
-    void onStartError();
 
 signals:
-    void message(QString msg);
+    void connectToDevice(int timeout);
     void serviceDiscovered(QLowEnergyService *service, const QString &address);
     void upgradeResult(bool success, const QString &address);
-    void startError();
-
-private:
-    void deviceError();
 
 private:
     QThread *m_thread = nullptr;
-    //QLowEnergyController *m_controller = nullptr;
-    QPointer<QLowEnergyController> m_controller;
-    QBluetoothDeviceInfo m_device_info;
+    QLowEnergyController *m_controller = nullptr;
     Service *m_service = nullptr;
-    int m_timeout_count = 3;
-
-    bool m_startOTA = false;
-    bool m_startError = false;
-
-    QPointer<QTimer> m_startOTATimer;
+    int m_connect_count = 3;
+    QTimer *m_startOTATimer = nullptr;
+    QBluetoothDeviceInfo m_device;
 };
 
 #endif // CONTROLLER_H

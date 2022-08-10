@@ -1,6 +1,8 @@
 QT       += core gui bluetooth network
 WIN32:
 #CONFIG += console
+DEFINES += QT_MESSAGELOGCONTEXT
+CONFIG(debug, debug|release): DEFINES += QT_NO_DEBUG_OUTPUT
 
 greaterThan(QT_MAJOR_VERSION, 4): QT += widgets
 
@@ -17,10 +19,12 @@ SOURCES += \
     device.cpp \
     deviceinfo.cpp \
     httpsclient.cpp \
+    log.cpp \
     main.cpp \
     mainwindow.cpp \
     service.cpp \
-    serviceinfo.cpp
+    serviceinfo.cpp \
+    setup.cpp
 
 HEADERS += \
     agent.h \
@@ -29,9 +33,11 @@ HEADERS += \
     device.h \
     deviceinfo.h \
     httpsclient.h \
+    log.h \
     mainwindow.h \
     service.h \
-    serviceinfo.h
+    serviceinfo.h \
+    setup.h
 
 FORMS += \
     mainwindow.ui

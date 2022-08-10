@@ -1,4 +1,5 @@
 #include "httpsclient.h"
+#include "setup.h"
 #include <QDebug>
 #include <QNetworkReply>
 #include <QFile>
@@ -15,29 +16,21 @@ HttpsClient::HttpsClient(QObject *parent)
     m_requestTimer->setInterval(15 * 1000);
     m_requestTimer->setSingleShot(true);
 
-    //æµ‹è¯•ç¯å¢ƒ
-    m_serverAddress.append("http://47.243.45.185:8988/");
-
-    //æ­£å¼ç¯å¢ƒ
-    m_serverAddress.append("https://paas-ota.touchgui.cn/");
-    m_currentServerAddress = m_serverAddress[m_serverIndex];
-}
-
-void HttpsClient::setServerIndex(int index)
-{
-    if (index < m_serverAddress.size())
-    {
-        m_serverIndex = index;
+    if (setup->m_serverIndex == 0) {
+        //²âÊÔ»·¾³
+        m_serverAddress = "http://47.243.45.185:8988/";
+    } else {
+        //ÕıÊ½»·¾³
+        m_serverAddress = "https://paas-ota.touchgui.cn/";
     }
-    m_currentServerAddress = m_serverAddress[m_serverIndex];
-    qDebug() << "set server address:" << m_currentServerAddress;
+    qDebug() << "set server address:" << m_serverAddress;
 }
 
 int HttpsClient::verificationCode()
 {
     QByteArray data;
     const QString &url = "touchlink/verification/ordinary";
-    networkRequest(GET, m_currentServerAddress + url, data);
+    networkRequest(GET, m_serverAddress + url, data);
     if (data.isEmpty()) {
         return -1;
     }
@@ -58,7 +51,7 @@ int HttpsClient::login(const QString &name, const QString &password, const QStri
     document.setObject(jsonObj);
     QByteArray data;
     const QString &url = "touchlink/customer/ota/tool/login";
-    networkRequest(POST, m_currentServerAddress + url, data, document);
+    networkRequest(POST, m_serverAddress + url, data, document);
     QJsonParseError jsonError;
     document = QJsonDocument::fromJson(data, &jsonError);
     if (jsonError.error == QJsonParseError::NoError) {
@@ -82,7 +75,7 @@ int HttpsClient::upgradePackageList(QList<QStringList> &stringList)
     document.setObject(jsonObj);
     QByteArray data;
     const QString &url = "touchlink/customer/ota/tool/list";
-    networkRequest(POST, m_currentServerAddress + url, data, document);
+    networkRequest(POST, m_serverAddress + url, data, document);
     QJsonParseError jsonError;
     document = QJsonDocument::fromJson(data, &jsonError);
     if (jsonError.error == QJsonParseError::NoError) {
@@ -112,12 +105,12 @@ int HttpsClient::upgradePackageList(QList<QStringList> &stringList)
 }
 
 
-//åŒ…å«ä¸­æ–‡çš„æ–‡ä»¶åä¼šå¯¼è‡´ä¸‹è½½å¤±è´¥ 2022-7-16 æœªè§£å†³
+//°üº¬ÖĞÎÄµÄÎÄ¼şÃû»áµ¼ÖÂÏÂÔØÊ§°Ü 2022-7-16 Î´½â¾ö
 int HttpsClient::downloadPackage(const int custOtaId, QString &filename)
 {
     QByteArray data;
     const QString &url = "touchlink/customer/ota/tool/downloadOTA/" + QString::number(custOtaId);
-    networkRequest(GET, m_currentServerAddress + url, data);
+    networkRequest(GET, m_serverAddress + url, data);
     if (data.isEmpty()) {
         return -1;
     }
