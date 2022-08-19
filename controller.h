@@ -4,7 +4,7 @@
 #include <QLowEnergyController>
 #include <QBluetoothDeviceInfo>
 #include "service.h"
-#include <QTimer>
+#include <QSemaphore>
 
 class Controller : public QObject
 {
@@ -14,7 +14,7 @@ public:
     ~Controller();
 
     void ConnectDevice(int timeout);
-    void DisconnectDevice(void);
+    void DisconnectDevice(Service::ResultState state);
     QLowEnergyService *CreateService(const QBluetoothUuid &uuid);
     int connectCount() const {
         return m_connect_count;
@@ -24,6 +24,9 @@ public:
     }
     QString address() const {
         return m_device.address().toString();
+    }
+    QString getVersion() const {
+        return m_service->getVersion();
     }
 
 private slots:
@@ -42,7 +45,7 @@ private slots:
 signals:
     void connectToDevice(int timeout);
     void serviceDiscovered(QLowEnergyService *service, const QString &address);
-    void upgradeResult(bool success, const QString &address);
+    void upgradeResult(Service::ResultState state, const QString &address);
 
 private:
     QThread *m_thread = nullptr;
@@ -51,6 +54,8 @@ private:
     int m_connect_count = 3;
     QTimer *m_startOTATimer = nullptr;
     QBluetoothDeviceInfo m_device;
+    bool isLocked = false;
+    static QSemaphore g_Semaphore;
 };
 
 #endif // CONTROLLER_H

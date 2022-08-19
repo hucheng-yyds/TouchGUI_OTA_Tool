@@ -34,7 +34,7 @@ protected:
 private slots:
     void onDeviceDiscovered(const QBluetoothDeviceInfo &info);
     void onScanFinished(bool isTimeout);
-    void onUpgradeResult(bool success, const QString &address);
+    void onUpgradeResult(int state, const QString &address);
     void onUpdateTime();
 
     void on_pushButton_4_clicked();
@@ -52,6 +52,7 @@ private:
     void checkScan();
     void refreshVCode();
     void addProgressList(Controller *controller);
+    void reportUpgradeResult(const int index, const int state);
 
 private:
     Ui::MainWindow *ui;

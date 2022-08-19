@@ -90,12 +90,13 @@ MainWindow::MainWindow(QWidget *parent)
 
 MainWindow::~MainWindow()
 {
-    delete setup;
-    on_pushButton_6_clicked();
+    qDeleteAll(controller_list);
+    qDeleteAll(controller_progress_list);
     delete ui;
     delete https;
     delete m_timer;
     delete agent;
+    delete setup;
 }
 
 void MainWindow::GetDirectoryFile(const QString &srcDirName)
@@ -153,7 +154,7 @@ bool MainWindow::eventFilter(QObject *obj, QEvent *ev)
     if (ui->label_19 == obj
             && ev->type() == QEvent::MouseButtonDblClick) {
         QString dirName = QFileDialog::getExistingDirectory(this, tr("Open Directory"),
-                                                            QCoreApplication::applicationDirPath(),
+                                                            ".",
                                                             QFileDialog::ShowDirsOnly
                                                             | QFileDialog::DontResolveSymlinks);
         GetDirectoryFile(dirName);
@@ -226,7 +227,7 @@ void MainWindow::onDeviceDiscovered(const QBluetoothDeviceInfo &info)
     Controller *controller = new Controller(info);
     connect(controller, &Controller::upgradeResult, this, &MainWindow::onUpgradeResult);
     controller_list.append(controller);
-    if (controller_list.size() >= setup->m_queuemax) {
+    if (controller_list.size() >= /*setup->m_queuemax*/m_targetcount) {
         agent->stopScan();
     } else if (m_targetcount - m_successcount - m_failcount == controller_list.size()) {
         agent->stopScan();
@@ -257,6 +258,7 @@ void MainWindow::onScanFinished(bool isTimeout)
                         }
                     }
                     if (!find) {
+                        qInfo() << "time out address:" << address;
                         setup->m_fail_address_list << address;
                         m_failcount ++;
                     }
@@ -266,14 +268,15 @@ void MainWindow::onScanFinished(bool isTimeout)
             m_failcount = m_targetcount - m_successcount - controller_list.size();
         }
     }
-    while (!controller_list.isEmpty()) {
+    while (!controller_list.isEmpty()
+           && controller_progress_list.size() < setup->m_queuemax - 1) {
         qInfo() << "m_processingcount:" << m_processingcount << "setup->m_queuemax:" << setup->m_queuemax;
         addProgressList(controller_list.takeFirst());
     }
     checkScan();
 }
 
-void MainWindow::onUpgradeResult(bool success, const QString &address)
+void MainWindow::onUpgradeResult(int state, const QString &address)
 {
     QList<QTableWidgetItem*> list = ui->tableWidget_2->findItems(address, Qt::MatchFixedString);
     if (!list.isEmpty()) {//单个升级完成
@@ -282,17 +285,24 @@ void MainWindow::onUpgradeResult(bool success, const QString &address)
             qWarning() << "do not find device:" << address;
             return;
         }
-        qInfo() << address << "upgrade result:" << success
+        qInfo() << address << "upgrade result:" << (Service::ResultState)state
                 << "row index:" << index;
-        if (success) {
+        reportUpgradeResult(index, state);
+        switch (state) {
+        case Service::SuccessOTA:
+        case Service::HighVersion:
             ui->listWidget->addItem(address);//添加到升级成功列表
             ui->label_33->setText(QString::number(ui->listWidget->count()));
             m_successcount++;
             setup->m_success_address_list << address;
             delete controller_progress_list[index];
-        }
-        else
-        {
+            break;
+        case Service::LowEnergy:
+            m_failcount++;
+            setup->m_fail_address_list << address;
+            delete controller_progress_list[index];
+            break;
+        case Service::ConnectionException:
             if (controller_progress_list[index]->connectCount() < 0) {
                 m_failcount++;
                 setup->m_fail_address_list << address;
@@ -300,6 +310,9 @@ void MainWindow::onUpgradeResult(bool success, const QString &address)
             } else {
                 controller_list << controller_progress_list[index];
             }
+            break;
+        default:
+            break;
         }
         controller_progress_list.removeAt(index);
         ui->tableWidget_2->removeRow(index);//从正在升级列表移除
@@ -347,6 +360,13 @@ void MainWindow::checkScan()
         qInfo() << "hourCount:" << hourCount << m_elapsed_second << ui->listWidget->count();
         ui->label_48->setText(QString::number(hourCount, 'f', 0)+" units/hour");//平均速度
         ui->pushButton_4->setEnabled(true);
+//        QTimer::singleShot(5 * 1000, this, [this]{
+//            on_pushButton_6_clicked();
+//            on_pushButton_4_clicked();
+//            static int count = 0;
+//            count ++;
+//            qInfo() << "connect count:" << count;
+//        });
     }
 }
 
@@ -358,6 +378,22 @@ void MainWindow::addProgressList(Controller *controller)
     controller->ConnectDevice(setup->m_startTimeout);
     controller_progress_list << controller;
     m_processingcount ++;
+}
+
+void MainWindow::reportUpgradeResult(const int index, const int state)
+{
+    if (https->isLogged()) {
+        int currentRow = ui->tableWidget->currentRow();
+        QString custOtaId = ui->tableWidget->item(currentRow, 0)->text();
+        QString version = ui->tableWidget->item(currentRow, 2)->text();
+        QStringList strList;
+        strList << custOtaId;
+        strList << controller_progress_list[index]->address();
+        strList << version;
+        strList << QString::number(state);
+        strList << controller_progress_list[index]->getVersion();
+        https->reportResult(strList);
+    }
 }
 
 //OTA开始升级
@@ -424,9 +460,9 @@ void MainWindow::on_pushButton_6_clicked()
     ui->tableWidget_2->setRowCount(0);
     ui->listWidget->clear();
     m_timer->stop();
-    agent->cancelScan();
     qDeleteAll(controller_list);
     controller_list.clear();
+    agent->cancelScan();
     ui->pushButton_4->setEnabled(true);
 #else
     device->disconnectFromDevice();

@@ -18,7 +18,7 @@ HttpsClient::HttpsClient(QObject *parent)
 
     if (setup->m_serverIndex == 0) {
         //测试环境
-        m_serverAddress = "http://47.243.45.185:8988/";
+        m_serverAddress = "http://common.touchelx.com/";
     } else {
         //正式环境
         m_serverAddress = "https://paas-ota.touchgui.cn/";
@@ -126,6 +126,38 @@ int HttpsClient::downloadPackage(const int custOtaId, QString &filename)
     system("tar -xvf " + m_filename + " -C %cd%/" + dirname);
     filename = dirname;
     return 0;
+}
+
+int HttpsClient::reportResult(const QStringList &stringList)
+{
+    QJsonDocument document;
+    QJsonObject jsonObj;
+    int i = 0;
+    jsonObj.insert("custOtaId", stringList.value(i++));
+    jsonObj.insert("mac", stringList.value(i++));
+    jsonObj.insert("targetVersion", stringList.value(i++));
+    jsonObj.insert("upgradeStatus", stringList.value(i++));
+    jsonObj.insert("version", stringList.value(i++));
+    document.setObject(jsonObj);
+    QByteArray data;
+    const QString &url = "touchlink/customer/ota/tool/save";
+    networkRequest(POST, m_serverAddress + url, data, document);
+    QJsonParseError jsonError;
+    document = QJsonDocument::fromJson(data, &jsonError);
+    if (jsonError.error == QJsonParseError::NoError) {
+        jsonObj = document.object();
+        if (jsonObj.contains("code")
+                && 200 == jsonObj["code"].toInt()) {
+            qInfo() << "report success";
+            return 0;
+        }
+    }
+    return -1;
+}
+
+bool HttpsClient::isLogged()
+{
+    return !m_token.isEmpty();
 }
 
 void HttpsClient::networkRequest(RequestType reqType, const QString &url,

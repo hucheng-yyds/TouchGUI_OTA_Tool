@@ -5,6 +5,7 @@
 #include <QLowEnergyService>
 #include <QEventLoop>
 #include <QThread>
+#include <QTimer>
 
 #define CMD_HEAD_PARAM      (uchar)0x02
 #define PARAM_GET_INFO      (uchar)0x01
@@ -35,44 +36,45 @@ class Service : public QObject
 {
     Q_OBJECT
 public:
+    enum ResultState {
+        SuccessOTA = 0,
+        HighVersion,
+        LowEnergy,
+        ConnectionException
+    };
+    Q_ENUM(ResultState)
+
     explicit Service(QObject *parent = nullptr);
     ~Service();
 
     void ConnectService(QLowEnergyService *, const QString &address);
-    void OpenNotify(QLowEnergyCharacteristic ch, bool flag);
-    void ReadCharacteristic(QLowEnergyCharacteristic ch);
-    void WriteCharacteristic(QLowEnergyCharacteristic ch, const QByteArray &arr);
+    void OpenNotify(const QLowEnergyCharacteristic &ch, bool flag);
+    void ReadCharacteristic(const QLowEnergyCharacteristic &ch);
+    void WriteCharacteristic(const QLowEnergyCharacteristic &ch, const QByteArray &arr);
 
+    QString getVersion() const;
     uchar getFileType(int index);
     uint32_t CheckSum(uint8_t *pBuffer, uint8_t len);
-
-public:
-    enum ResultState {
-        SuccessOTA = 0,
-        LowEnergy,
-        HighVersion,
-        ConnectionException
-    };
 
 private slots:
     void onStateChanged(QLowEnergyService::ServiceState newState);
     void onCharacteristicChanged(const QLowEnergyCharacteristic &info,
                                  const QByteArray &value);
-//    void onCharacteristicRead(const QLowEnergyCharacteristic &info,
-//                              const QByteArray &value);
-//    void onCharacteristicWritten(const QLowEnergyCharacteristic &info,
-//                                 const QByteArray &value);
-//    void onDescriptorRead(const QLowEnergyDescriptor &info,
-//                          const QByteArray &value);
-//    void onDescriptorWritten(const QLowEnergyDescriptor &info,
-//                             const QByteArray &value);
+#ifdef QT_DEBUG
+    void onCharacteristicRead(const QLowEnergyCharacteristic &info,
+                              const QByteArray &value);
+    void onCharacteristicWritten(const QLowEnergyCharacteristic &info,
+                                 const QByteArray &value);
+    void onDescriptorRead(const QLowEnergyDescriptor &info,
+                          const QByteArray &value);
+    void onDescriptorWritten(const QLowEnergyDescriptor &info,
+                             const QByteArray &value);
+#endif
     void onError(QLowEnergyService::ServiceError error);
 
 signals:
-    void discoveryCharacteristic(QLowEnergyCharacteristic);
-    void disconnectDevice();
-    void upgradeResult(bool success, const QString &address);
-    void startOTA(const QString &address);
+    void upgradeResult(Service::ResultState state);
+    void startOTA();
     void recvOTABodyReply();
 
 private:
@@ -85,7 +87,9 @@ private:
 
     QLowEnergyService *m_service = nullptr;
     QLowEnergyCharacteristic m_characteristics;
+    QByteArray m_oy22b_tpversion;
     QString m_address;
+    QString m_version;
 
     bool m_last_pack = false;
     bool m_set_offset = false;
@@ -98,8 +102,6 @@ private:
     int m_check_sum = 0;
     int m_cur_sum = 0;
     bool m_ota_finished = false;
-
-    QByteArray m_oy22b_tpversion;
 };
 
 #endif // SERVICE_H

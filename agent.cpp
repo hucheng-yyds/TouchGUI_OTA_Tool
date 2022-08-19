@@ -37,26 +37,21 @@ void Agent::startScan()
     m_cancel = false;
     try {
         qDebug("scan started...");
+#if 1
         m_agent->start(QBluetoothDeviceDiscoveryAgent::LowEnergyMethod);
+#else
+    //直连问题多！controller析构无法正常调用
+    for (const auto &string : qAsConst(setup->m_address_list)) {
+        QBluetoothAddress mac(string);
+        if (mac.isNull()) {
+            continue ;
+        }
+        const QBluetoothDeviceInfo info(mac, "", 0);
+        emit deviceDiscovered(info);
+    }
+    emit scanFinished(false);
+#endif
 //        startTimer();
-        //直连问题多！controller析构无法正常调用
-//        int i = setup->m_queuemax - setup->m_processingcount;
-//        for (const auto &string : qAsConst(setup->m_address_list)) {
-//            QBluetoothAddress mac(string);
-//            if (mac.isNull()) {
-//                continue ;
-//            }
-
-//            if (i > 0) {
-//                const QBluetoothDeviceInfo info(mac, "", 0);
-//                emit deviceDiscovered(info);
-//                i--;
-//            }
-//            else
-//            {
-//                break;
-//            }
-//        }
     } catch (...) {
         qDebug("start scan error exception...");
     }
@@ -109,7 +104,7 @@ void Agent::onDeviceDiscovered(const QBluetoothDeviceInfo &info)
             return ;
         }
     } else {
-        if (-1 == info.name().indexOf(m_match_str)) {
+        if (!info.name().contains(m_match_str, Qt::CaseInsensitive)) {
             return ;
         }
     }

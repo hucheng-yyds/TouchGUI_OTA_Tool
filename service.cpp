@@ -1,7 +1,5 @@
 #include "service.h"
 #include "setup.h"
-#include <QTime>
-#include <QTimer>
 #include <QCryptographicHash>
 
 #define print   qInfo() << m_address
@@ -11,8 +9,7 @@
 
 Service::Service(QObject *parent) : QObject(parent)
 {
-    QString tmp = "S.22B.51.66";
-    m_oy22b_tpversion = tmp.toUtf8();
+    m_oy22b_tpversion = "S.22B.51.66";
     m_oy22b_tpversion.resize(12);
 }
 
@@ -37,19 +34,20 @@ void Service::ConnectService(QLowEnergyService * service, const QString &address
         {
             connect(m_service, SIGNAL(stateChanged(QLowEnergyService::ServiceState)), this, SLOT(onStateChanged(QLowEnergyService::ServiceState)));
             connect(m_service, SIGNAL(characteristicChanged(QLowEnergyCharacteristic, QByteArray)), this, SLOT(onCharacteristicChanged(QLowEnergyCharacteristic, QByteArray)));
-//            connect(m_service, SIGNAL(characteristicRead(QLowEnergyCharacteristic, QByteArray)), this, SLOT(onCharacteristicRead(QLowEnergyCharacteristic, QByteArray)));
-//            connect(m_service, SIGNAL(characteristicWritten(QLowEnergyCharacteristic, QByteArray)), this, SLOT(onCharacteristicWritten(QLowEnergyCharacteristic, QByteArray)));
-//            connect(m_service, SIGNAL(descriptorRead(QLowEnergyDescriptor, QByteArray)), this, SLOT(onDescriptorRead(QLowEnergyDescriptor, QByteArray)));
-//            connect(m_service, SIGNAL(descriptorWritten(QLowEnergyDescriptor, QByteArray)), this, SLOT(onDescriptorWritten(QLowEnergyDescriptor, QByteArray)));
+#ifdef QT_DEBUG
+            connect(m_service, SIGNAL(characteristicRead(QLowEnergyCharacteristic, QByteArray)), this, SLOT(onCharacteristicRead(QLowEnergyCharacteristic, QByteArray)));
+            connect(m_service, SIGNAL(characteristicWritten(QLowEnergyCharacteristic, QByteArray)), this, SLOT(onCharacteristicWritten(QLowEnergyCharacteristic, QByteArray)));
+            connect(m_service, SIGNAL(descriptorRead(QLowEnergyDescriptor, QByteArray)), this, SLOT(onDescriptorRead(QLowEnergyDescriptor, QByteArray)));
+            connect(m_service, SIGNAL(descriptorWritten(QLowEnergyDescriptor, QByteArray)), this, SLOT(onDescriptorWritten(QLowEnergyDescriptor, QByteArray)));
+#endif
             connect(m_service, SIGNAL(error(QLowEnergyService::ServiceError)), this, SLOT(onError(QLowEnergyService::ServiceError)));
-//            QThread::msleep(200);
-            m_service->discoverDetails();
+            QTimer::singleShot(200, this, [this]{ m_service->discoverDetails(); });
             print << "discoverDetails";
         }
     }
 }
 
-void Service::OpenNotify(QLowEnergyCharacteristic ch, bool flag)
+void Service::OpenNotify(const QLowEnergyCharacteristic &ch, bool flag)
 {
     if(m_service)
     {
@@ -74,7 +72,7 @@ void Service::OpenNotify(QLowEnergyCharacteristic ch, bool flag)
     }
 }
 
-void Service::ReadCharacteristic(QLowEnergyCharacteristic ch)
+void Service::ReadCharacteristic(const QLowEnergyCharacteristic &ch)
 {
     if(m_service)
     {
@@ -88,7 +86,7 @@ void Service::ReadCharacteristic(QLowEnergyCharacteristic ch)
     }
 }
 
-void Service::WriteCharacteristic(QLowEnergyCharacteristic ch, const QByteArray &arr)
+void Service::WriteCharacteristic(const QLowEnergyCharacteristic &ch, const QByteArray &arr)
 {
     printd << "Write Characteristic: " << arr.left(10).toHex('|');
     if(m_service)
@@ -109,6 +107,11 @@ void Service::WriteCharacteristic(QLowEnergyCharacteristic ch, const QByteArray 
             }
         }
     }
+}
+
+QString Service::getVersion() const
+{
+    return m_version;
 }
 
 uint32_t Service::CheckSum(uint8_t *pBuffer, uint8_t len)
@@ -134,7 +137,6 @@ void Service::onStateChanged(QLowEnergyService::ServiceState newState)
         if (m_ota_finished && !setup->m_ota_poweroff)
         {
 //            print << "OTA is already finished...";
-//            emit upgradeResult(true, m_address);
             return;
         }
 
@@ -153,11 +155,14 @@ void Service::onStateChanged(QLowEnergyService::ServiceState newState)
                 if (ch.uuid().data1 == 0x27f7
                         || ch.uuid().data1 == 0x0af7) {
                     OpenNotify(ch, true);
-                    emit discoveryCharacteristic(ch);
                 }
             }
             SendCmdKeyData(CMD_HEAD_SETUP, SETUP_AUTH);
             SendCmdKeyData(CMD_HEAD_PARAM, PARAM_GET_INFO);
+//            emit startOTA();
+//            QTimer::singleShot(10 * 1000, this, [this]{
+//                emit upgradeResult(SuccessOTA);
+//            });
         }
             break;
         default:
@@ -182,11 +187,11 @@ void Service::onCharacteristicChanged(const QLowEnergyCharacteristic &info, cons
                     SendCmdKeyData(CMD_HEAD_OTA, OTA_SEND_START);
                 } else {
                     m_ota_finished = true;
-                    emit upgradeResult(true, m_address);
+                    emit upgradeResult(SuccessOTA);
                 }
             } else {
                 printw << "fail: OTA_SEND_START";
-                emit disconnectDevice();
+                emit upgradeResult(ConnectionException);
             }
             break;
         case OTA_SEND_BODY:
@@ -220,12 +225,11 @@ void Service::onCharacteristicChanged(const QLowEnergyCharacteristic &info, cons
             break;
         case OTA_SEND_END:
             if (0 == value[2]) {//文件发送完成
-                printd << "file_name:" << setup->m_file_name_list[m_file_index]
+                print << "file_name:" << setup->m_file_name_list[m_file_index]
                        << "done";
                 StopSendData();
                 if ((m_file_index + 1) >= setup->m_file_data_list.size()) {
                     m_ota_finished = true;
-
                     if (setup->m_ota_poweroff)
                     {
                         SendCmdKeyData(CMD_HEAD_SYSTEM, SYSTEM_POWER_OFF);
@@ -235,14 +239,14 @@ void Service::onCharacteristicChanged(const QLowEnergyCharacteristic &info, cons
                         SendCmdKeyData(CMD_HEAD_SYSTEM, SYSTEM_REBOOT);
                     }
                     print << "ota successfully...";
-                    emit upgradeResult(true, m_address);
+                    emit upgradeResult(SuccessOTA);
                 } else {
                     m_file_index ++;
                     SendCmdKeyData(CMD_HEAD_OTA, OTA_SEND_START);
                 }
             } else {
                 printw << "fail: OTA_SEND_END";
-                emit disconnectDevice();
+                emit upgradeResult(ConnectionException);
             }
             break;
         case OTA_SET_OFFSET:
@@ -254,7 +258,7 @@ void Service::onCharacteristicChanged(const QLowEnergyCharacteristic &info, cons
             }
             break;
         case OTA_SET_PROGRESS:
-            emit startOTA(m_address);
+            emit startOTA();
             SendCmdKeyData(CMD_HEAD_OTA, OTA_SEND_START);
             break;
         default:
@@ -267,19 +271,20 @@ void Service::onCharacteristicChanged(const QLowEnergyCharacteristic &info, cons
                 SendCmdKeyData(CMD_HEAD_PARAM, PARAM_GET_VER);
             } else {
                 printw << "battery:" << int(value[7]) << "has_detail_version:" << int(value[10]);
-                emit upgradeResult(false, m_address);
+                emit upgradeResult(LowEnergy);
             }
             break;
         case PARAM_GET_VER:
             if (!setup->m_ignore_version_compare
                     && !setup->m_version.isEmpty())
             {
+                m_version = value.mid(8, 12);
                 if (CompareVersion(setup->m_version, value.mid(8, 12)) <= 0
                         && (CompareVersion(m_oy22b_tpversion, value.mid(8, 12)) != 0))
                 {
                     printw << "target version:" << setup->m_version
                            << "device version:" << value.mid(8, 12);
-                    emit upgradeResult(true, m_address);
+                    emit upgradeResult(HighVersion);
                     return;
                 }
             }
@@ -294,27 +299,31 @@ void Service::onCharacteristicChanged(const QLowEnergyCharacteristic &info, cons
         }
     }
 }
+#ifdef QT_DEBUG
+void Service::onCharacteristicRead(const QLowEnergyCharacteristic &info, const QByteArray &value)
+{
+    QString ch = info.uuid().toString() + " - Characteristic read:" + QString(value);
+    printd << ch;
+}
 
-//void Service::onCharacteristicRead(const QLowEnergyCharacteristic &info, const QByteArray &value)
-//{
-//    QString ch = info.uuid().toString() + " - Characteristic read:" + QString(value);
-//}
+void Service::onCharacteristicWritten(const QLowEnergyCharacteristic &info, const QByteArray &value)
+{
+    QString ch = info.uuid().toString() + " - Characteristic written:" + value.left(10).toHex('|');
+    printd << ch;
+}
 
-//void Service::onCharacteristicWritten(const QLowEnergyCharacteristic &info, const QByteArray &value)
-//{
-//    QString ch = info.uuid().toString() + " - Characteristic written:" + value.left(10).toHex('|');
-//}
+void Service::onDescriptorRead(const QLowEnergyDescriptor &info, const QByteArray &value)
+{
+    QString ch = info.uuid().toString() + " - descriptor read:" + QString(value);
+    printd << ch;
+}
 
-//void Service::onDescriptorRead(const QLowEnergyDescriptor &info, const QByteArray &value)
-//{
-//    QString ch = info.uuid().toString() + " - descriptor read:" + QString(value);
-//}
-
-//void Service::onDescriptorWritten(const QLowEnergyDescriptor &info, const QByteArray &value)
-//{
-//    QString ch = info.uuid().toString() + " - descriptor written:" + QString(value);
-//}
-
+void Service::onDescriptorWritten(const QLowEnergyDescriptor &info, const QByteArray &value)
+{
+    QString ch = info.uuid().toString() + " - descriptor written:" + QString(value);
+    printd << ch;
+}
+#endif
 void Service::onError(QLowEnergyService::ServiceError error)
 {
 
@@ -341,7 +350,7 @@ void Service::onError(QLowEnergyService::ServiceError error)
             //OTA成功后的关机指令可能会触发连接异常
             return;
         }
-        emit disconnectDevice();
+        emit upgradeResult(ConnectionException);
     }
 }
 
@@ -422,7 +431,7 @@ void Service::StartSendData()
             if (!WaitOTABodyReply(10))
             {
                 printc << "recv d1 02 time out";
-                emit disconnectDevice();
+                emit upgradeResult(ConnectionException);
                 break ;
             }
 

@@ -31,7 +31,7 @@ Setup::Setup(QObject *parent)
             } else if (!string.indexOf("loglevel:"))
             {
                 string.remove(0, 9);
-                Log::m_LogLevel = string.toInt();
+                Log::m_LogLevel = (QtMsgType)string.toInt();
             } else if (!string.indexOf("server:"))
             {
                 string.remove(0, 7);

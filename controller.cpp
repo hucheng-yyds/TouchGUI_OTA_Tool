@@ -1,11 +1,10 @@
 #include "controller.h"
-#include <QTime>
-#include <QTimer>
 
 #define print  qInfo() << m_device.address().toString()// << QThread::currentThreadId()
-
+QSemaphore Controller::g_Semaphore(1);
 Controller::Controller(const QBluetoothDeviceInfo &info)
 {
+    qRegisterMetaType<Service::ResultState>("Service::ResultState");
     m_device = info;
     m_thread = new QThread;
     moveToThread(m_thread);
@@ -14,8 +13,7 @@ Controller::Controller(const QBluetoothDeviceInfo &info)
     m_service = new Service;
     m_service->moveToThread(m_thread);
     connect(this, &Controller::serviceDiscovered, m_service, &Service::ConnectService);
-    connect(m_service, &Service::disconnectDevice, this, &Controller::DisconnectDevice);
-    connect(m_service, &Service::upgradeResult, this, &Controller::upgradeResult);
+    connect(m_service, &Service::upgradeResult, this, &Controller::DisconnectDevice);
     connect(m_service, &Service::startOTA, this, &Controller::onStartOTA);
 
     m_startOTATimer = new QTimer;
@@ -26,14 +24,12 @@ Controller::Controller(const QBluetoothDeviceInfo &info)
 
 Controller::~Controller()
 {
-    m_controller->disconnectFromDevice();
     m_controller->deleteLater();
     m_service->deleteLater();
     m_startOTATimer->deleteLater();
     m_thread->quit();
-    qInfo() << "m_thread wait:" << m_thread->wait(30 * 1000);
-    delete m_thread;
-    qInfo() << "~Controller";
+    connect(m_thread, &QThread::finished, m_thread, &QThread::deleteLater);
+    print << "~Controller";
 }
 
 void Controller::ConnectDevice(int timeout)
@@ -42,13 +38,14 @@ void Controller::ConnectDevice(int timeout)
     emit connectToDevice(timeout);
 }
 
-void Controller::DisconnectDevice()
+void Controller::DisconnectDevice(Service::ResultState state)
 {
+    m_startOTATimer->stop();
     m_controller->disconnectFromDevice();
 //    m_controller->deleteLater();
 //    m_controller = nullptr;
 //    m_thread->quit();
-    emit upgradeResult(false, address());
+    emit upgradeResult(state, address());
     print << "m_connect_count:" << m_connect_count;
 }
 
@@ -68,13 +65,21 @@ void Controller::onConnected()
 {
     if (m_controller)
     {
-        m_controller->discoverServices();
+//        isLocked = true;
+//        Controller::g_Semaphore.acquire();
+//        print << "g_Semaphore is" << Controller::g_Semaphore.available();
+        QTimer::singleShot(1000, this, [this]{
+            m_controller->discoverServices();
+        });
     }
 }
 
 void Controller::onDisconnected()
 {
-
+    if (isLocked) {
+        isLocked = false;
+        Controller::g_Semaphore.release();
+    }
 }
 
 void Controller::onStateChanged(QLowEnergyController::ControllerState state)
@@ -105,14 +110,64 @@ void Controller::onError(QLowEnergyController::Error newError)
         str += m_controller->errorString();
 
         print << str;
-        DisconnectDevice();
+        DisconnectDevice(Service::ConnectionException);
     }
 }
+#if 0
+#include "windows.h"
+__int64 Filetime2Int64(const FILETIME* ftime)
+{
+    LARGE_INTEGER li;
+    li.LowPart = ftime->dwLowDateTime;
+    li.HighPart = ftime->dwHighDateTime;
+    return li.QuadPart;
+}
+//两个时间相减运算
+__int64 CompareFileTime(FILETIME preTime, FILETIME nowTime)
+{
+    return Filetime2Int64(&nowTime) - Filetime2Int64(&preTime);
+}
+int calCpuUsage()// 耗时操作
+{
+        HANDLE hEvent;
+        bool res;
+        static FILETIME preIdleTime;
+        static FILETIME preKernelTime;
+        static FILETIME preUserTime;
 
+        FILETIME idleTime;
+        FILETIME kernelTime;
+        FILETIME userTime;
+
+        res = GetSystemTimes(&idleTime, &kernelTime, &userTime);
+        if (!res)
+            return -1;
+
+        preIdleTime = idleTime;
+        preKernelTime = kernelTime;
+        preUserTime = userTime;
+
+        hEvent = CreateEvent(NULL, FALSE, FALSE, NULL);
+
+        WaitForSingleObject(hEvent, 500);	//等待500毫秒
+
+        res = GetSystemTimes(&idleTime, &kernelTime, &userTime);
+        if (!res)
+            return -1;
+
+        int idle = CompareFileTime(preIdleTime, idleTime);
+        int kernel = CompareFileTime(preKernelTime, kernelTime);
+        int user = CompareFileTime(preUserTime, userTime);
+
+        auto nCpuRate = (int)ceil(100.0 * (kernel + user - idle) / (kernel + user));
+        return nCpuRate;
+}
+#endif
 void Controller::onConnectToDevice(int timeout)
 {
+//    qInfo() << "calCpuUsage:" << calCpuUsage();
     m_connect_count --;
-    m_startOTATimer->start(timeout * 1000);
+    m_startOTATimer->setInterval(timeout * 1000);
     if (!m_controller) {
         m_controller = QLowEnergyController::createCentral(m_device);
         m_controller->moveToThread(m_thread);
@@ -125,7 +180,6 @@ void Controller::onConnectToDevice(int timeout)
         connect(m_controller, SIGNAL(connectionUpdated(QLowEnergyConnectionParameters)), this, SLOT(onConnectionUpdated(QLowEnergyConnectionParameters)));
     }
     m_controller->connectToDevice();
-    print << "m_startOTATimer:" << m_startOTATimer->isActive();
 }
 
 void Controller::onServiceDiscovered(QBluetoothUuid serviceUUID)
@@ -140,6 +194,7 @@ void Controller::onServiceDiscovered(QBluetoothUuid serviceUUID)
 void Controller::onDiscoveryFinished()
 {
     print << "service discovery finished";
+    m_startOTATimer->start();
     QList<QBluetoothUuid> uuids= m_controller->services();
     for (const auto &uuid : qAsConst(uuids)) {
         if (0x27f0 == uuid.data1
@@ -160,10 +215,14 @@ void Controller::onStartOTA()
 {
     print << "service begin to ota";
     m_startOTATimer->stop();
+    if (isLocked) {
+        isLocked = false;
+        Controller::g_Semaphore.release();
+    }
 }
 
 void Controller::onStartOTATimeout()
 {
     print << "start ota timeout";
-    DisconnectDevice();
+    DisconnectDevice(Service::ConnectionException);
 }
